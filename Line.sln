@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.26403.7
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Line", "Line\Line.vcxproj", "{4D566248-12A5-44B7-ABE7-AEE8EE057E4C}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LineLinux", "Line\LineLinux.vcxproj", "{BEB70CCB-A2D9-45D9-9CF6-6D531DDAFF74}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|ARM = Debug|ARM
+		Debug|x64 = Debug|x64
+		Release|ARM = Release|ARM
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4D566248-12A5-44B7-ABE7-AEE8EE057E4C}.Debug|ARM.ActiveCfg = Debug|x64
+		{4D566248-12A5-44B7-ABE7-AEE8EE057E4C}.Debug|x64.ActiveCfg = Debug|x64
+		{4D566248-12A5-44B7-ABE7-AEE8EE057E4C}.Debug|x64.Build.0 = Debug|x64
+		{4D566248-12A5-44B7-ABE7-AEE8EE057E4C}.Release|ARM.ActiveCfg = Release|x64
+		{4D566248-12A5-44B7-ABE7-AEE8EE057E4C}.Release|x64.ActiveCfg = Release|x64
+		{4D566248-12A5-44B7-ABE7-AEE8EE057E4C}.Release|x64.Build.0 = Release|x64
+		{BEB70CCB-A2D9-45D9-9CF6-6D531DDAFF74}.Debug|ARM.ActiveCfg = Debug|ARM
+		{BEB70CCB-A2D9-45D9-9CF6-6D531DDAFF74}.Debug|ARM.Build.0 = Debug|ARM
+		{BEB70CCB-A2D9-45D9-9CF6-6D531DDAFF74}.Debug|x64.ActiveCfg = Debug|ARM
+		{BEB70CCB-A2D9-45D9-9CF6-6D531DDAFF74}.Release|ARM.ActiveCfg = Release|ARM
+		{BEB70CCB-A2D9-45D9-9CF6-6D531DDAFF74}.Release|ARM.Build.0 = Release|ARM
+		{BEB70CCB-A2D9-45D9-9CF6-6D531DDAFF74}.Release|x64.ActiveCfg = Release|ARM
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
