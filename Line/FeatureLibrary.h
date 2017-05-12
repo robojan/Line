@@ -27,6 +27,9 @@ public:
 
 	void Add(FeatureType type, const std::string &name, const std::string &path);
 	void Add(FeatureType type, const std::string &name, cv::Mat image);
+	
+	void SetTypeOverlayColor(FeatureType type, const cv::Scalar &color);
+	const cv::Scalar &GetOverlayColor(FeatureType type) const;
 
 	const std::vector<cv::KeyPoint> &GetKeypoints(FeatureType type, const std::string &name) const;
 	const cv::Mat &GetDescriptors(FeatureType type, const std::string &name) const;
@@ -42,7 +45,13 @@ private:
 		cv::Mat image;
 	};
 
+	struct typeInfo
+	{
+		cv::Scalar overlayColor;
+		std::map<std::string, struct featureInfo> objects;
+	};
+
 	cv::Ptr<cv::xfeatures2d::SURF> _detector;
 	cv::Ptr<cv::DescriptorMatcher> _matcher;
-	std::map<FeatureType, std::map<std::string, struct featureInfo>> _featuremap;
+	std::map<FeatureType, struct typeInfo> _featuremap;
 };

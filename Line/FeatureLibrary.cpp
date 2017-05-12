@@ -16,30 +16,46 @@ FeatureLibrary::~FeatureLibrary()
 
 void FeatureLibrary::Add(FeatureType type, const std::string &name, const std::string &path)
 {
-	cv::Mat image = cv::imread(path, cv::IMREAD_GRAYSCALE);
+	cv::Mat image = cv::imread(path, cv::IMREAD_COLOR);
 	if(image.empty())
 	{
 		throw ImageReadException(("Could not open the image file. " + path).c_str());
 	}
-	Add(type, name, image);
+	cv::cvtColor(image, image, CV_BGR2Lab);
+	std::vector<cv::Mat> planes(3);
+	cv::split(image, planes);
+	Add(type, name, planes[0]);
 }
 
 void FeatureLibrary::Add(FeatureType type, const std::string &name, cv::Mat image)
 {
 	struct featureInfo info;
+
+	cv::Canny(image, image, 150, 200, 3);
+
 	_detector->detectAndCompute(image, cv::Mat(), info.keypoints, info.descriptor);
 	info.image = image;
-	_featuremap[type][name] = info;
+	_featuremap[type].objects[name] = info;
+}
+
+void FeatureLibrary::SetTypeOverlayColor(FeatureType type, const cv::Scalar& color)
+{
+	_featuremap[type].overlayColor = color;
+}
+
+const cv::Scalar& FeatureLibrary::GetOverlayColor(FeatureType type) const
+{
+	return _featuremap.at(type).overlayColor;
 }
 
 const std::vector<cv::KeyPoint> &FeatureLibrary::GetKeypoints(FeatureType type, const std::string &name) const
 {
-	return _featuremap.at(type).at(name).keypoints;
+	return _featuremap.at(type).objects.at(name).keypoints;
 }
 
 const cv::Mat& FeatureLibrary::GetDescriptors(FeatureType type, const std::string& name) const
 {
-	return _featuremap.at(type).at(name).descriptor;
+	return _featuremap.at(type).objects.at(name).descriptor;
 }
 
 std::string FeatureLibrary::FindMatch(cv::InputArray image, double *avgDist, double *minDist, double *maxDist)
@@ -75,7 +91,7 @@ std::string FeatureLibrary::FindMatch(FeatureType type, cv::InputArray image, do
 	double bestMinDist = INFINITY;
 	double bestMaxDist = 0;
 	std::string bestMatch;
-	for (auto object : _featuremap.at(type))
+	for (auto object : _featuremap.at(type).objects)
 	{
 		double curAvgDist, curMinDist, curMaxDist;
 		if(FindMatch(type, object.first, image, &curAvgDist, &curMinDist, &curMaxDist))
@@ -98,7 +114,7 @@ std::string FeatureLibrary::FindMatch(FeatureType type, cv::InputArray image, do
 bool FeatureLibrary::FindMatch(FeatureType type, const std::string name, cv::InputArray image, double *avgDist, double *minDist, double *maxDist)
 {
 	std::vector<cv::DMatch> matches;
-	struct featureInfo objectInfo = _featuremap.at(type).at(name);
+	struct featureInfo objectInfo = _featuremap.at(type).objects.at(name);
 
 	struct featureInfo sceneInfo;
 	_detector->detectAndCompute(image, cv::Mat(), sceneInfo.keypoints, sceneInfo.descriptor);
@@ -138,5 +154,5 @@ bool FeatureLibrary::FindMatch(FeatureType type, const std::string name, cv::Inp
 	if (minDist) *minDist = min_dist;
 	if (maxDist) *maxDist = max_dist;
 	if (avgDist) *avgDist = avg_dist;
-	return avg_dist <= 0.35;
+	return avg_dist <= 0.4;
 }

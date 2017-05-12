@@ -8,6 +8,7 @@
 #include <opencv2/highgui.hpp>
 #include "ImgProcessor.h"
 #include <iomanip>
+#include <iostream>
 
 using namespace cv;
 
@@ -39,7 +40,11 @@ void mainLoopSingleFrame(Mat frame, ImgProcessor &processor)
 		fpsStream << "FPS: " << std::setprecision(2) << fps;
 		putText(display, fpsStream.str(), Point(5, 20), FONT_HERSHEY_PLAIN, 2, Scalar(0, 0, 255), 2);
 
-		imshow("Output Display", display);
+		if(!display.empty())
+		{
+			imshow("Output Display", display);
+		}
+		std::cout << fpsStream.str() << std::endl;
 		processor.PrintPerf();
 	}
 }
@@ -48,14 +53,26 @@ void mainLoopVideo(VideoCapture video, ImgProcessor &processor)
 {
 	Mat frame, display;
 	int64 lastFrameTime = getTickCount();
-	while ((char)waitKey(1) != 'q')
+	bool freeze = false;
+	while (true)
 	{
+		char key = (char)waitKey(1);
+		switch (key) {
+		case 'q':
+			break;
+		case 'f':
+			freeze = !freeze;
+			break;
+		}
 		int64 now = getTickCount();
 		double tickFrequency = getTickFrequency();
 		double fps = tickFrequency / (now - lastFrameTime);
 		lastFrameTime = now;
 
-		video >> frame;
+		if(!freeze)
+		{
+			video >> frame;
+		}
 		if (frame.empty()) {
 			break;
 		}
@@ -64,7 +81,11 @@ void mainLoopVideo(VideoCapture video, ImgProcessor &processor)
 		std::ostringstream fpsStream;
 		fpsStream << "FPS: " << std::setprecision(2) << fps;
 		putText(display, fpsStream.str(), Point(5, 20), FONT_HERSHEY_PLAIN, 2, Scalar(0, 0, 255), 2);
-		imshow("Output Display", display);
+		if (!display.empty())
+		{
+			imshow("Output Display", display);
+		}
+		std::cout << fpsStream.str() << std::endl;
 		processor.PrintPerf();
 	}
 }
@@ -83,8 +104,34 @@ int main(int argc, char **argv)
 		}
 	}
 
-	ImgProcessor processor(options.GetProcessingResolution());
+	printf("Loading feature library\n");
+	FeatureLibrary library(400);
+	try
+	{
+		library.Add(FeatureType::BlueSign, "Left", "signs/left_64.jpg");
+		library.Add(FeatureType::BlueSign, "Right", "signs/right_64.jpg");
+		library.Add(FeatureType::BlueSign, "Forward", "signs/straight_64.jpg");
+		library.Add(FeatureType::RedSign, "Stop", "signs/stop_64.jpg");
+		library.Add(FeatureType::YellowSign, "UTurn", "signs/uturn_64.jpg");
+		library.SetTypeOverlayColor(FeatureType::BlueSign, Scalar(255, 0, 0));
+		library.SetTypeOverlayColor(FeatureType::RedSign, Scalar(0, 0, 255));
+		library.SetTypeOverlayColor(FeatureType::YellowSign, Scalar(0, 255, 255));
+	}
+	catch (ImageReadException &e)
+	{
+		fprintf(stderr, "Error: %s\n", e.what());
+		return 3;
+	}
+
+	ImgProcessor processor(options.GetProcessingResolution(), &library);
 	processor.SetHorizon(options.GetHorizon());
+	processor.EnableDisplay(options.IsDebugMode());
+	processor.SetSignRatioLimit(0.5f, 2.0f);
+	processor.SetSignAreaLimit(100, 5000);
+	processor.SetThreshold(FeatureType::BlueSign, ColorThreshold(Scalar(0, 130, 92), Scalar(255, 140, 105)));
+	processor.SetThreshold(FeatureType::RedSign, ColorThreshold(Scalar(0, 170, 138), Scalar(255, 180, 155)));
+	processor.SetThreshold(FeatureType::YellowSign, ColorThreshold(Scalar(0, 145, 190), Scalar(255, 160, 210)));
+	processor.SetTrackFrames(options.IsTracking() ? 30 * 5 : 0);
 
 	std::string captureDevice = options.GetCaptureDevice();
 	if (captureDevice.empty())
