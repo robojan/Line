@@ -39,8 +39,10 @@
   <PropertyGroup Label="UserMacros" />
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="OptionsManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="OptionsManager.h" />
   </ItemGroup>
   <ItemDefinitionGroup />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
