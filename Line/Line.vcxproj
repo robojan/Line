@@ -39,10 +39,12 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\OpenCVWinDbg.props" />
+    <Import Project="..\OpenGLWin.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\OpenCVWin.props" />
+    <Import Project="..\OpenGLWin.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -80,13 +82,33 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="FeatureLibrary.cpp" />
+    <ClCompile Include="GLAccelerator.cpp" />
     <ClCompile Include="ImgProcessor.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="OptionsManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="FeatureLibrary.h" />
+    <ClInclude Include="GLAccelerator.h" />
     <ClInclude Include="ImgProcessor.h" />
     <ClInclude Include="OptionsManager.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="resources\signs\left.jpg" />
+    <Image Include="resources\signs\left_64.jpg" />
+    <Image Include="resources\signs\right.jpg" />
+    <Image Include="resources\signs\right_64.jpg" />
+    <Image Include="resources\signs\stop.jpg" />
+    <Image Include="resources\signs\stop_64.jpg" />
+    <Image Include="resources\signs\straight.jpg" />
+    <Image Include="resources\signs\straight_64.jpg" />
+    <Image Include="resources\signs\uturn.jpg" />
+    <Image Include="resources\signs\uturn_64.jpg" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="resources\shaders\frag.glsl" />
+    <None Include="resources\shaders\vert.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

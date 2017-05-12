@@ -13,6 +13,12 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Resource Files\shaders">
+      <UniqueIdentifier>{f7a1257c-7457-410c-b4ee-23d42e2ee1b0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource Files\signs">
+      <UniqueIdentifier>{676f2f4d-882e-4f36-8045-0185bd42bbd9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -24,6 +30,12 @@
     <ClCompile Include="ImgProcessor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="FeatureLibrary.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GLAccelerator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="OptionsManager.h">
@@ -32,5 +44,51 @@
     <ClInclude Include="ImgProcessor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="FeatureLibrary.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GLAccelerator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="resources\signs\left.jpg">
+      <Filter>Resource Files\signs</Filter>
+    </Image>
+    <Image Include="resources\signs\left_64.jpg">
+      <Filter>Resource Files\signs</Filter>
+    </Image>
+    <Image Include="resources\signs\right.jpg">
+      <Filter>Resource Files\signs</Filter>
+    </Image>
+    <Image Include="resources\signs\right_64.jpg">
+      <Filter>Resource Files\signs</Filter>
+    </Image>
+    <Image Include="resources\signs\stop.jpg">
+      <Filter>Resource Files\signs</Filter>
+    </Image>
+    <Image Include="resources\signs\stop_64.jpg">
+      <Filter>Resource Files\signs</Filter>
+    </Image>
+    <Image Include="resources\signs\straight.jpg">
+      <Filter>Resource Files\signs</Filter>
+    </Image>
+    <Image Include="resources\signs\straight_64.jpg">
+      <Filter>Resource Files\signs</Filter>
+    </Image>
+    <Image Include="resources\signs\uturn.jpg">
+      <Filter>Resource Files\signs</Filter>
+    </Image>
+    <Image Include="resources\signs\uturn_64.jpg">
+      <Filter>Resource Files\signs</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="resources\shaders\frag.glsl">
+      <Filter>Resource Files\shaders</Filter>
+    </None>
+    <None Include="resources\shaders\vert.glsl">
+      <Filter>Resource Files\shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

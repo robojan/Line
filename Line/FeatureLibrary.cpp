@@ -1,0 +1,142 @@
+#include "FeatureLibrary.h"
+#include <opencv2/imgcodecs.hpp>
+#include <exception>
+#include <opencv2/imgproc.hpp>
+
+FeatureLibrary::FeatureLibrary(int minHessian /* = 400 */)
+{
+	_detector = cv::xfeatures2d::SURF::create(minHessian);
+	_matcher = cv::BFMatcher::create(cv::NORM_L2, true);
+}
+
+FeatureLibrary::~FeatureLibrary()
+{
+	
+}
+
+void FeatureLibrary::Add(FeatureType type, const std::string &name, const std::string &path)
+{
+	cv::Mat image = cv::imread(path, cv::IMREAD_GRAYSCALE);
+	if(image.empty())
+	{
+		throw ImageReadException(("Could not open the image file. " + path).c_str());
+	}
+	Add(type, name, image);
+}
+
+void FeatureLibrary::Add(FeatureType type, const std::string &name, cv::Mat image)
+{
+	struct featureInfo info;
+	_detector->detectAndCompute(image, cv::Mat(), info.keypoints, info.descriptor);
+	info.image = image;
+	_featuremap[type][name] = info;
+}
+
+const std::vector<cv::KeyPoint> &FeatureLibrary::GetKeypoints(FeatureType type, const std::string &name) const
+{
+	return _featuremap.at(type).at(name).keypoints;
+}
+
+const cv::Mat& FeatureLibrary::GetDescriptors(FeatureType type, const std::string& name) const
+{
+	return _featuremap.at(type).at(name).descriptor;
+}
+
+std::string FeatureLibrary::FindMatch(cv::InputArray image, double *avgDist, double *minDist, double *maxDist)
+{
+	double bestAvgDist = INFINITY;
+	double bestMinDist = INFINITY;
+	double bestMaxDist = 0;
+	std::string bestMatch;
+	for(auto type : _featuremap)
+	{
+		double curAvgDist, curMinDist, curMaxDist;
+		std::string result = FindMatch(type.first, image, &curAvgDist, &curMinDist, &curMaxDist);
+		if(!result.empty())
+		{
+			if (curAvgDist < bestAvgDist)
+			{
+				bestMatch = result;
+				bestMinDist = curMinDist;
+				bestMaxDist = curMaxDist;
+				bestAvgDist = curAvgDist;
+			}
+		}
+	}
+	if (minDist) *minDist = bestMinDist;
+	if (maxDist) *maxDist = bestMaxDist;
+	if (avgDist) *avgDist = bestAvgDist;
+	return bestMatch;
+}
+
+std::string FeatureLibrary::FindMatch(FeatureType type, cv::InputArray image, double *avgDist, double *minDist, double *maxDist)
+{
+	double bestAvgDist = INFINITY;
+	double bestMinDist = INFINITY;
+	double bestMaxDist = 0;
+	std::string bestMatch;
+	for (auto object : _featuremap.at(type))
+	{
+		double curAvgDist, curMinDist, curMaxDist;
+		if(FindMatch(type, object.first, image, &curAvgDist, &curMinDist, &curMaxDist))
+		{
+			if(curAvgDist < bestAvgDist)
+			{
+				bestMatch = object.first;
+				bestMinDist = curMinDist;
+				bestMaxDist = curMaxDist;
+				bestAvgDist = curAvgDist;
+			}
+		}
+	}
+	if (minDist) *minDist = bestMinDist;
+	if (maxDist) *maxDist = bestMaxDist;
+	if (avgDist) *avgDist = bestAvgDist;
+	return bestMatch;
+}
+
+bool FeatureLibrary::FindMatch(FeatureType type, const std::string name, cv::InputArray image, double *avgDist, double *minDist, double *maxDist)
+{
+	std::vector<cv::DMatch> matches;
+	struct featureInfo objectInfo = _featuremap.at(type).at(name);
+
+	struct featureInfo sceneInfo;
+	_detector->detectAndCompute(image, cv::Mat(), sceneInfo.keypoints, sceneInfo.descriptor);
+
+	if (sceneInfo.descriptor.rows == 0)
+		return false;
+
+	// Match descriptor 
+	_matcher->match(objectInfo.descriptor, sceneInfo.descriptor, matches);
+
+	// Find max and min distances
+	double max_dist = 0; 
+	double min_dist = INFINITY;
+	double avg_dist = 0;
+	for(unsigned int i = 0; i < matches.size(); i++)
+	{
+		double dist = matches[i].distance;
+		avg_dist += dist;
+		if (dist < min_dist) min_dist = dist;
+		if (dist > max_dist) max_dist = dist;
+	}
+	avg_dist /= matches.size();
+
+	// Find good matches
+	std::vector<cv::DMatch> goodMatches;
+	for(unsigned int i = 0; i < matches.size(); i++)
+	{
+		if(matches[i].distance <= 4 * min_dist)
+		{
+			goodMatches.push_back(matches[i]);
+		}
+	}
+
+	cv::Mat img_matches;
+	cv::drawMatches(objectInfo.image, objectInfo.keypoints, image, sceneInfo.keypoints, goodMatches, img_matches,
+		cv::Scalar::all(-1), cv::Scalar::all(-1), std::vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+	if (minDist) *minDist = min_dist;
+	if (maxDist) *maxDist = max_dist;
+	if (avgDist) *avgDist = avg_dist;
+	return avg_dist <= 0.35;
+}
