@@ -121,6 +121,11 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display)
 		}
 	} else
 	{
+		_perf.sign.thresh = 0;
+		_perf.sign.erosion = 0;
+		_perf.sign.dilation = 0;
+		_perf.sign.contour = 0;
+		_perf.sign.detect = 0;
 		ProcessTracking(skyImg, _detectedSigns, skyDisplay);
 		_trackedFrames++;
 	}
@@ -340,6 +345,8 @@ void ImgProcessor::StartTracking(cv::Mat& frame, std::vector<track_data_t>& dete
 
 void ImgProcessor::ProcessTracking(cv::Mat& frame, std::vector<track_data_t>& detected, cv::Mat& display)
 {
+	int64 t1, t2;
+	t1 = getTickCount();
 	for(unsigned int i = 0; i < _trackers.size(); i++)
 	{
 		if(!_trackers[i]->update(frame, _trackRegion[i]))
@@ -355,6 +362,8 @@ void ImgProcessor::ProcessTracking(cv::Mat& frame, std::vector<track_data_t>& de
 			rectangle(display, _trackRegion[i], color, 2, LINE_8, 0);
 		}
 	}
+	t2 = getTickCount();
+	_perf.sign.tracking = t2 - t1;
 }
 
 float getTimeMs(int64 time)
@@ -377,7 +386,7 @@ std::string ImgProcessor::GetPerfString(const ImgProcessor::Performance& perf)
 	int64 line = perf.line.blur + perf.line.canny + 
 		perf.line.hough + perf.line.drawing;
 	int64 sign = perf.sign.thresh + perf.sign.erosion + perf.sign.dilation +
-		perf.sign.contour + perf.sign.detect;
+		perf.sign.contour + perf.sign.detect + perf.sign.tracking;
 
 	int64 frame = pre + line + sign;
 
@@ -399,6 +408,7 @@ std::string ImgProcessor::GetPerfString(const ImgProcessor::Performance& perf)
 		"\t\tdilation:   " << getTimeMs(perf.sign.dilation) << "ms\n"
 		"\t\tcontouring: " << getTimeMs(perf.sign.contour) << "ms\n"
 		"\t\tDetection:  " << getTimeMs(perf.sign.detect) << "ms\n"
+		"\t\tTracking:   " << getTimeMs(perf.sign.tracking) << "ms\n"
 		;
 	return ss.str();
 }
@@ -424,4 +434,5 @@ void ImgProcessor::UpdatePerf()
 	_avgPerf.sign.dilation = (_avgPerf.sign.dilation * 3 + _perf.sign.dilation) / 4;
 	_avgPerf.sign.contour = (_avgPerf.sign.contour * 3 + _perf.sign.contour) / 4;
 	_avgPerf.sign.detect = (_avgPerf.sign.detect * 3 + _perf.sign.detect) / 4;
+	_avgPerf.sign.tracking = (_avgPerf.sign.tracking * 3 + _perf.sign.tracking) / 4;
 }

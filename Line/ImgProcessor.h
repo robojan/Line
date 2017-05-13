@@ -69,6 +69,7 @@ private:
 			int64 dilation;
 			int64 contour;
 			int64 detect;
+			int64 tracking;
 		} sign;
 	};
 
