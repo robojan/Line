@@ -34,7 +34,7 @@ class ImgProcessor
 {
 public:
 
-	ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary);
+	ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, bool accelerated);
 	~ImgProcessor();
 
 	void Process(cv::Mat &frame, cv::Mat &display);
@@ -75,9 +75,9 @@ private:
 
 	std::string GetPerfString(const struct ImgProcessor::Performance &perf);
 	void UpdatePerf();
-	void ScaleFrame(cv::Mat &frame);
+	void ScaleFrame(cv::Mat& in, cv::Mat &out);
 	void ProcessLines(cv::Mat &frame, cv::Mat &display);
-	void ProcessSigns(cv::Mat &frame, cv::Mat &lumFrame, cv::Mat &display);
+	void ProcessSigns(cv::Mat &frame, int frameGLTex, cv::Mat &lumFrame, cv::Mat &display);
 	void ProcessSignContour(cv::Mat& frame, cv::Mat& display,
 		const std::vector<std::vector<cv::Point>>& contours,
 		const std::vector<cv::Vec4i>& hierarchy,

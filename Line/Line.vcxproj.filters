@@ -84,11 +84,12 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <None Include="resources\shaders\frag.glsl">
-      <Filter>Resource Files\shaders</Filter>
-    </None>
     <None Include="resources\shaders\vert.glsl">
       <Filter>Resource Files\shaders</Filter>
     </None>
+    <None Include="resources\shaders\cc.glsl">
+      <Filter>Resource Files\shaders</Filter>
+    </None>
+    <None Include="resources\shaders\thresh.glsl" />
   </ItemGroup>
 </Project>

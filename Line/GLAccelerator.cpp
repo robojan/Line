@@ -15,6 +15,17 @@
 #include <streambuf>
 #include <sstream>
 
+#define GL_CHECK_ERROR() \
+	do { \
+		GLenum error = glGetError(); \
+		if (error != GL_NO_ERROR) \
+		{ \
+			std::stringstream ss; \
+			ss << "OpenGL error " << __FILE__ << "(" << __LINE__ << "): " << std::hex << (error); \
+			throw GLAcceleratorException(ss.str()); \
+		} \
+	} while (false)
+
 #ifdef _WIN32
 static void displayCallback()
 {
@@ -124,8 +135,169 @@ void GLAccelerator::CreateX11Window()
 }
 #endif
 
-GLAccelerator::GLAccelerator() :
-	_window(0), _outputSize(640,480)
+
+std::string ReadFile(const std::string &path)
+{
+	std::ifstream fs(path.c_str(), std::ios_base::in);
+	if(!fs.is_open())
+	{
+		throw std::runtime_error("Could not open the file: " + path);
+	}
+	std::string result;
+	fs.seekg(0, std::ios::end);
+	result.reserve(fs.tellg());
+	fs.seekg(0, std::ios::beg);
+
+	result.assign((std::istreambuf_iterator<char>(fs)), std::istreambuf_iterator<char>());
+	return result;
+}
+
+GLTexture::GLTexture() : 
+	_texture(-1), _size(0,0)
+{
+}
+
+GLTexture::~GLTexture()
+{
+	if(IsValid())
+	{
+		glDeleteTextures(1, &_texture);
+	}
+}
+
+unsigned int GLTexture::GetTexture()
+{
+	return _texture;
+}
+
+const cv::Size& GLTexture::GetSize()
+{
+	return _size;
+}
+
+bool GLTexture::IsValid() const
+{
+	return glIsTexture(_texture) == GL_TRUE;
+}
+
+void GLTexture::ReadTexture(const cv::Mat &input)
+{
+	int height = input.rows;
+	int width = input.cols;
+
+	if (height != _size.height || width != _size.width)
+	{
+		if (IsValid())
+		{
+			glDeleteTextures(1, &_texture);
+		}
+		GL_CHECK_ERROR();
+		glGenTextures(1, &_texture);
+		GL_CHECK_ERROR();
+		glBindTexture(GL_TEXTURE_2D, _texture);
+		GL_CHECK_ERROR();
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+		GL_CHECK_ERROR();
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		GL_CHECK_ERROR();
+	}
+	glBindTexture(GL_TEXTURE_2D, _texture);
+	GL_CHECK_ERROR();
+
+	if (input.isContinuous())
+	{
+		const unsigned char *srcPtr = input.ptr<uchar>(0);
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, srcPtr);
+	}
+	else
+	{
+		for (int y = 0; y < height; y++)
+		{
+			const unsigned char *srcPtr = input.ptr<uchar>(y);
+			for (int x = 0; x < width; x++)
+			{
+				glTexSubImage2D(GL_TEXTURE_2D, 0, 0, y, width, 1, GL_RGB, GL_UNSIGNED_BYTE, srcPtr);
+			}
+		}
+	}
+	GL_CHECK_ERROR();
+}
+
+GLFramebuffer::GLFramebuffer(cv::Size size) :
+	_size(size), _fbo(-1), _texture(-1)
+{
+	GL_CHECK_ERROR();
+	glGenFramebuffers(1, &_fbo);
+	GL_CHECK_ERROR();
+	glGenTextures(1, &_texture);
+	GL_CHECK_ERROR();
+	glBindTexture(GL_TEXTURE_2D, _texture);
+	GL_CHECK_ERROR();
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, _size.width, _size.height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	GL_CHECK_ERROR();
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	GL_CHECK_ERROR();
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	GL_CHECK_ERROR();
+	Bind();
+	GL_CHECK_ERROR();
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _texture, 0);
+	GL_CHECK_ERROR();
+}
+
+GLFramebuffer::~GLFramebuffer()
+{
+	if(glIsTexture(_texture))
+	{
+		glDeleteTextures(1, &_texture);
+	}
+	if(glIsFramebuffer(_fbo))
+	{
+		glDeleteFramebuffers(1, &_fbo);
+	}
+}
+
+unsigned int GLFramebuffer::GetFramebuffer()
+{
+	return _fbo;
+}
+
+unsigned int GLFramebuffer::GetTexture()
+{
+	return _texture;
+}
+
+const cv::Size& GLFramebuffer::GetSize()
+{
+	return _size;
+}
+
+bool GLFramebuffer::IsValid() const
+{
+	return (glIsFramebuffer(_fbo) && glIsTexture(_texture));
+}
+
+void GLFramebuffer::Bind()
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
+}
+
+void GLFramebuffer::GetImage(cv::Mat& output)
+{
+	output.create(_size, CV_8UC3);
+#ifdef _WIN32
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, _fbo);
+#else
+	glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
+#endif
+	glReadPixels(0, 0, _size.width, _size.height, GL_RGB, GL_UNSIGNED_BYTE, output.ptr());
+}
+
+GLAccelerator::GLAccelerator(const std::string &shaderPath) :
+	_window(0), _basePath(shaderPath)
 {
 #ifdef _WIN32
 	int argc = 1;
@@ -141,6 +313,7 @@ GLAccelerator::GLAccelerator() :
 	{
 		fprintf(stderr, "Could not initialize GLEW");
 	}
+	GL_CHECK_ERROR();
 #else
 	CreateX11Window();
 #endif
@@ -160,131 +333,35 @@ GLAccelerator::~GLAccelerator()
 void GLAccelerator::Update()
 {
 #ifdef _WIN32
+	glutSwapBuffers();
+#else
+
+#endif
+#ifdef _WIN32
 	glutMainLoopEvent();
 #else
 
 #endif
 }
 
-void GLAccelerator::SetOutputSize(int width, int height)
+void GLAccelerator::ProcessFrame(const std::string &name, const cv::Mat &input)
 {
-	_outputSize.width = width;
-	_outputSize.height = height;
+	auto program = _programs.at(name);
 
-	glBindFramebuffer(GL_FRAMEBUFFER, _outputFBO);
-	glDeleteTextures(1, &_outputTexture);
-	glGenTextures(1, &_outputTexture);
-	glBindTexture(GL_TEXTURE_2D, _outputTexture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, _outputSize.width, _outputSize.height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _outputTexture, 0);
-	//GLenum drawBuffers[1] = { GL_COLOR_ATTACHMENT0 };
-	//glDrawBuffers(1, drawBuffers);
+	program->Process(input);
+
 }
 
-void GLAccelerator::SetThreshold1(cv::Scalar low, cv::Scalar high)
+void GLAccelerator::ProcessFrame(const std::string& name, unsigned glTexture)
 {
-	_threshLow1 = low;
-	_threshHigh1 = high;
+	auto program = _programs.at(name);
+
+	program->Process(glTexture);
 }
 
-void GLAccelerator::SetThreshold2(cv::Scalar low, cv::Scalar high)
+void GLAccelerator::CreateProgram(const std::string& name, cv::Size outputSize)
 {
-	_threshLow2 = low;
-	_threshHigh2 = high;
-}
-
-void GLAccelerator::SetThreshold3(cv::Scalar low, cv::Scalar high)
-{
-	_threshLow3 = low;
-	_threshHigh3 = high;
-}
-
-void GLAccelerator::ReadInputTexture(const cv::Mat &input)
-{
-	int height = input.rows;
-	int width = input.cols;
-
-	if(height != _inputTextureSize.height || width != _inputTextureSize.width)
-	{
-		if(glIsTexture(_inputTexture))
-		{
-			glDeleteTextures(1, &_inputTexture);
-		}
-		glGenTextures(1, &_inputTexture);
-		glBindTexture(GL_TEXTURE_2D, _inputTexture);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	}
-	glBindTexture(GL_TEXTURE_2D, _inputTexture);
-
-	if (input.isContinuous())
-	{
-		const unsigned char *srcPtr = input.ptr<uchar>(0);
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, srcPtr);
-	}
-	else
-	{
-		for (int y = 0; y < height; y++)
-		{
-			const unsigned char *srcPtr = input.ptr<uchar>(y);
-			for (int x = 0; x < width; x++)
-			{
-				glTexSubImage2D(GL_TEXTURE_2D, 0, 0, y, width, 1, GL_RGB, GL_UNSIGNED_BYTE, srcPtr);
-			}
-		}
-	}
-}
-
-void GLAccelerator::WriteOutputImage(cv::Mat& output, int fbo)
-{
-	output.create(_outputSize, CV_8UC3);
-#ifdef _WIN32
-	glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
-#else
-	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-#endif
-	glReadPixels(0, 0, _outputSize.width, _outputSize.height, GL_RGB, GL_UNSIGNED_BYTE, output.ptr());
-}
-
-void GLAccelerator::ProcessFrame(const cv::Mat &input, cv::Mat &maskImg)
-{
-	ReadInputTexture(input);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, _outputFBO);
-	glViewport(0, 0, _outputSize.width, _outputSize.height);
-
-	glUseProgram(_program);
-	glEnableVertexAttribArray(_programLocs.a_vertex);
-	glBindBuffer(GL_ARRAY_BUFFER, _vbo);
-	glVertexAttribPointer(_programLocs.a_vertex, 2, GL_FLOAT, GL_FALSE, 0, (void *)0);
-	glEnableVertexAttribArray(_programLocs.a_uv);
-	glBindBuffer(GL_ARRAY_BUFFER, _uvbo);
-	glVertexAttribPointer(_programLocs.a_uv, 2, GL_FLOAT, GL_FALSE, 0, (void *)0);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, _inputTexture);
-	glUniform1i(_programLocs.inputTexture, 0);
-	glUniform3f(_programLocs.threshold1_low, (float)_threshLow1[0], (float)_threshLow1[1], (float)_threshLow1[2]);
-	glUniform3f(_programLocs.threshold2_low, (float)_threshLow2[0], (float)_threshLow2[1], (float)_threshLow2[2]);
-	glUniform3f(_programLocs.threshold3_low, (float)_threshLow3[0], (float)_threshLow3[1], (float)_threshLow3[2]);
-	glUniform3f(_programLocs.threshold1_high, (float)_threshHigh1[0], (float)_threshHigh1[1], (float)_threshHigh1[2]);
-	glUniform3f(_programLocs.threshold2_high, (float)_threshHigh2[0], (float)_threshHigh2[1], (float)_threshHigh2[2]);
-	glUniform3f(_programLocs.threshold3_high, (float)_threshHigh3[0], (float)_threshHigh3[1], (float)_threshHigh3[2]);
-
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-	glDisableVertexAttribArray(0);
-
-	WriteOutputImage(maskImg, _outputFBO);
-
-#ifdef _WIN32
-	glutSwapBuffers();
-#else
-
-#endif
+	_programs[name] = new GLProgram(this, name, outputSize);
 }
 
 void GLAccelerator::LoadVertexShader(const std::string& path)
@@ -293,16 +370,129 @@ void GLAccelerator::LoadVertexShader(const std::string& path)
 	SetVertexShader(src);
 }
 
-void GLAccelerator::LoadFragmentShader(const std::string& path)
+GLProgram::GLProgram(GLAccelerator* accelerator, const std::string& name, cv::Size outputSize) :
+	_accelerator(accelerator), _name(name), _output(outputSize)
 {
-	std::string src = ReadFile(path);
+	LoadFragmentShader(name);
+	LinkProgram();
+}
+
+GLProgram::~GLProgram()
+{
+	if(glIsShader(_fragmentShader))
+	{
+		glDeleteShader(_fragmentShader);
+	}
+	if(glIsProgram(_program))
+	{
+		glDeleteProgram(_program);
+	}
+}
+
+void GLProgram::SetUniform(const std::string& name, int i)
+{
+	glUseProgram(_program);
+	glUniform1i(GetUniformLoc(name), i);
+}
+
+void GLProgram::SetUniform(const std::string& name, float f)
+{
+	glUseProgram(_program);
+	glUniform1f(GetUniformLoc(name), f);
+}
+
+void GLProgram::SetUniform(const std::string& name, const cv::Vec3f& x)
+{
+	glUseProgram(_program);
+	glUniform3f(GetUniformLoc(name), x[0], x[1], x[2]);
+}
+
+void GLProgram::SetUniformColor(const std::string& name, const cv::Scalar& x)
+{
+	glUseProgram(_program);
+	glUniform3f(GetUniformLoc(name), float(x[0]), float(x[1]), float(x[2]));
+}
+
+void GLProgram::Process(const cv::Mat& input)
+{
+	_input.ReadTexture(input);
+	_output.Bind();
+	cv::Size outputSize = _output.GetSize();
+	glViewport(0, 0, outputSize.width, outputSize.height);
+
+	glUseProgram(_program);
+	int vertexLoc = GetAttributeLoc("a_vertex");
+	int uvLoc = GetAttributeLoc("a_uv");
+	_accelerator->BindVertexAttributes(vertexLoc, uvLoc);
+	glActiveTexture(GL_TEXTURE0);
+	_input.Bind();
+	glUniform1i(GetUniformLoc("inputTexture"), 0);
+
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	glDisableVertexAttribArray(0);
+}
+
+void GLProgram::Process(unsigned glTexture)
+{
+	_output.Bind();
+	cv::Size outputSize = _output.GetSize();
+	glViewport(0, 0, outputSize.width, outputSize.height);
+
+	glUseProgram(_program);
+	int vertexLoc = GetAttributeLoc("a_vertex");
+	int uvLoc = GetAttributeLoc("a_uv");
+	_accelerator->BindVertexAttributes(vertexLoc, uvLoc);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, glTexture);
+	glUniform1i(GetUniformLoc("inputTexture"), 0);
+
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	glDisableVertexAttribArray(0);
+}
+
+int GLProgram::GetUniformLoc(const std::string& name)
+{
+	auto locIt = _uniformLocs.find(name);
+	if (locIt == _uniformLocs.end())
+	{
+		int loc = glGetUniformLocation(_program, name.c_str());
+		_uniformLocs[name] = loc;
+		if (_uniformLocs[name] < 0)
+		{
+			fprintf(stderr, std::string("Warning: can't find uniform " + name + " in shader program\n").c_str());
+		}
+		return loc;
+	}
+	return locIt->second;
+}
+
+int GLProgram::GetAttributeLoc(const std::string& name)
+{
+	auto locIt = _attributeLocs.find(name);
+	if(locIt == _attributeLocs.end())
+	{
+		int loc = glGetAttribLocation(_program, name.c_str());
+		_attributeLocs[name] = loc;
+		if (_attributeLocs[name] < 0)
+		{
+			fprintf(stderr, std::string("Warning: can't find attrib " + name + " in shader program\n").c_str());
+		}
+		return loc;
+	}
+	return locIt->second;
+}
+
+void GLProgram::LoadFragmentShader(const std::string& name)
+{
+	std::string src = ReadFile(_accelerator->GetBaseShaderPath() + name + ".glsl");
 	SetFragmentShader(src);
 }
 
 void GLAccelerator::SetVertexShader(const std::string &source)
 {
+	GL_CHECK_ERROR();
 	_vertexShader = glCreateShader(GL_VERTEX_SHADER);
-	if(_vertexShader == 0 )
+	if(!glIsShader(_vertexShader))
 	{
 		std::stringstream ss;
 		ss << "Error creating vertex shader: " << (glGetError());
@@ -338,15 +528,17 @@ void GLAccelerator::SetVertexShader(const std::string &source)
 		}
 		throw ShaderProgramException(ss.str());
 	}
+	GL_CHECK_ERROR();
 }
 
-void GLAccelerator::SetFragmentShader(const std::string &source)
+void GLProgram::SetFragmentShader(const std::string &source)
 {
+	GL_CHECK_ERROR();
 	_fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-	if (_fragmentShader == 0)
+	if (!glIsShader(_fragmentShader))
 	{
 		std::stringstream ss;
-		ss << "Error creating fragment shader: " << (glGetError());
+		ss << "Error creating fragment shader: " << std::hex << (glGetError());
 		throw ShaderProgramException(ss.str());
 	}
 	int length = (int)source.length();
@@ -356,7 +548,7 @@ void GLAccelerator::SetFragmentShader(const std::string &source)
 	if (error != GL_NO_ERROR)
 	{
 		std::stringstream ss;
-		ss << "Error assigning source to fragment shader: " << (error);
+		ss << "Error assigning source to fragment shader: " << std::hex << (error);
 		throw ShaderProgramException(ss.str());
 	}
 
@@ -379,23 +571,25 @@ void GLAccelerator::SetFragmentShader(const std::string &source)
 		}
 		throw ShaderProgramException(ss.str());
 	}
+	GL_CHECK_ERROR();
 }
 
-void GLAccelerator::LinkProgram()
+void GLProgram::LinkProgram()
 {
+	GL_CHECK_ERROR();
 	_program = glCreateProgram();
-	if(_program == 0)
+	if(!glIsProgram(_program))
 	{
 		std::stringstream ss;
-		ss << "Error creating program: " << glGetError();
+		ss << "Error creating program: " << std::hex << glGetError();
 		throw ShaderProgramException(ss.str());
 	}
-	glAttachShader(_program, _vertexShader);
+	glAttachShader(_program, _accelerator->GetVertexShader());
 	GLenum error = glGetError();
 	if (error != GL_NO_ERROR)
 	{
 		std::stringstream ss;
-		ss << "Error attaching vertex shader to program: " << error;
+		ss << "Error attaching vertex shader to program: " << std::hex << error;
 		throw ShaderProgramException(ss.str());
 	}
 	glAttachShader(_program, _fragmentShader);
@@ -403,7 +597,7 @@ void GLAccelerator::LinkProgram()
 	if (error != GL_NO_ERROR)
 	{
 		std::stringstream ss;
-		ss << "Error attaching fragment shader to program: " << error;
+		ss << "Error attaching fragment shader to program: " << std::hex << error;
 		throw ShaderProgramException(ss.str());
 	}
 	glLinkProgram(_program);
@@ -412,7 +606,7 @@ void GLAccelerator::LinkProgram()
 	if (status == GL_FALSE)
 	{
 		std::stringstream ss;
-		ss << "Error linking program: " << error;
+		ss << "Error linking program: " << std::hex << error;
 		GLint logLen;
 		glGetProgramiv(_program, GL_INFO_LOG_LENGTH, &logLen);
 		if (logLen > 0)
@@ -426,52 +620,7 @@ void GLAccelerator::LinkProgram()
 		throw ShaderProgramException(ss.str());
 	}
 
-	_programLocs.inputTexture = glGetUniformLocation(_program, "inputTexture");
-	if(_programLocs.inputTexture < 0)
-	{
-		fprintf(stderr, "Warning: can't find uniform inputTexture in shader program\n");
-	}
-	_programLocs.threshold1_low = glGetUniformLocation(_program, "threshold1_low");
-	if (_programLocs.inputTexture < 0)
-	{
-		fprintf(stderr, "Warning: can't find uniform threshold1_low in shader program\n");
-	}
-	_programLocs.threshold2_low = glGetUniformLocation(_program, "threshold2_low");
-	if (_programLocs.inputTexture < 0)
-	{
-		fprintf(stderr, "Warning: can't find uniform threshold2_low in shader program\n");
-	}
-	_programLocs.threshold3_low = glGetUniformLocation(_program, "threshold3_low");
-	if (_programLocs.inputTexture < 0)
-	{
-		fprintf(stderr, "Warning: can't find uniform threshold3_low in shader program\n");
-	}
-	_programLocs.threshold1_high = glGetUniformLocation(_program, "threshold1_high");
-	if (_programLocs.inputTexture < 0)
-	{
-		fprintf(stderr, "Warning: can't find uniform threshold2_high in shader program\n");
-	}
-	_programLocs.threshold2_high = glGetUniformLocation(_program, "threshold2_high");
-	if (_programLocs.inputTexture < 0)
-	{
-		fprintf(stderr, "Warning: can't find uniform threshold2_high in shader program\n");
-	}
-	_programLocs.threshold3_high = glGetUniformLocation(_program, "threshold3_high");
-	if (_programLocs.inputTexture < 0)
-	{
-		fprintf(stderr, "Warning: can't find uniform threshold3_high in shader program\n");
-	}
-	_programLocs.a_vertex = glGetAttribLocation(_program, "a_vertex");
-	if (_programLocs.a_vertex < 0)
-	{
-		fprintf(stderr, "Warning: can't find attrib a_vertex in shader program\n");
-	}
-	_programLocs.a_uv = glGetAttribLocation(_program, "a_uv");
-	if (_programLocs.a_uv < 0)
-	{
-		fprintf(stderr, "Warning: can't find attrib a_uv in shader program\n");
-	}
-
+	GL_CHECK_ERROR();
 }
 
 void GLAccelerator::InitGL()
@@ -488,36 +637,96 @@ void GLAccelerator::InitGL()
 		0, 0,
 		1, 0
 	};
-	_inputTexture = -1;
-	_inputTextureSize = cv::Size();
+	GL_CHECK_ERROR();
 	glGenBuffers(1, &_vbo);
+	GL_CHECK_ERROR();
 	glBindBuffer(GL_ARRAY_BUFFER, _vbo);
+	GL_CHECK_ERROR();
 	glBufferData(GL_ARRAY_BUFFER, 8 * sizeof(float), vertexData, GL_STATIC_DRAW);
+	GL_CHECK_ERROR();
 	glGenBuffers(1, &_uvbo);
+	GL_CHECK_ERROR();
 	glBindBuffer(GL_ARRAY_BUFFER, _uvbo);
+	GL_CHECK_ERROR();
 	glBufferData(GL_ARRAY_BUFFER, 8 * sizeof(float), uvData, GL_STATIC_DRAW);
-	glGenFramebuffers(1, &_outputFBO);
-	glBindFramebuffer(GL_FRAMEBUFFER, _outputFBO);
-	glGenTextures(1, &_outputTexture);
-	glBindTexture(GL_TEXTURE_2D, _outputTexture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, _outputSize.width, _outputSize.height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _outputTexture, 0);
-	//GLenum drawBuffers[1] = { GL_COLOR_ATTACHMENT0 };
-	//glDrawBuffers(1, drawBuffers);
-	//glGenVertexArrays(1, &_vao);
-	//glBindVertexArray(_vao);
+	GL_CHECK_ERROR();
+	LoadVertexShader(GetBaseShaderPath() + "vert.glsl");
+	GL_CHECK_ERROR();
 }
 
-std::string GLAccelerator::ReadFile(const std::string& path)
+const std::string& GLAccelerator::GetBaseShaderPath()
 {
-	std::ifstream fs(path.c_str(), std::ios_base::in);
-	std::string result;
-	fs.seekg(0, std::ios::end);
-	result.reserve(fs.tellg());
-	fs.seekg(0, std::ios::beg);
+	return _basePath;
+}
 
-	result.assign((std::istreambuf_iterator<char>(fs)), std::istreambuf_iterator<char>());
-	return result;
+unsigned int GLAccelerator::GetVertexShader()
+{
+	return _vertexShader;
+}
+
+void GLTexture::Bind()
+{
+	glBindTexture(GL_TEXTURE_2D, _texture);
+}
+
+void GLAccelerator::BindVertexAttributes(int vertexLoc, int uvLoc)
+{
+	glEnableVertexAttribArray(vertexLoc);
+	glBindBuffer(GL_ARRAY_BUFFER, _vbo);
+	glVertexAttribPointer(vertexLoc, 2, GL_FLOAT, GL_FALSE, 0, (void *)0);
+	glEnableVertexAttribArray(uvLoc);
+	glBindBuffer(GL_ARRAY_BUFFER, _uvbo);
+	glVertexAttribPointer(uvLoc, 2, GL_FLOAT, GL_FALSE, 0, (void *)0);
+}
+
+void GLAccelerator::SetProgramUniformColor(const std::string& program, const std::string& uniform, const cv::Scalar &x)
+{
+	auto programPtr = _programs.at(program);
+
+	programPtr->SetUniformColor(uniform, x);
+}
+
+void GLAccelerator::SetProgramUniform(const std::string& program, const std::string& uniform, const cv::Vec3f& x)
+{
+	auto programPtr = _programs.at(program);
+
+	programPtr->SetUniform(uniform, x);
+}
+
+void GLAccelerator::SetProgramUniform(const std::string& program, const std::string& uniform, int x)
+{
+	auto programPtr = _programs.at(program);
+
+	programPtr->SetUniform(uniform, x);
+}
+
+void GLAccelerator::SetProgramUniform(const std::string& program, const std::string& uniform, float x)
+{
+	auto programPtr = _programs.at(program);
+
+	programPtr->SetUniform(uniform, x);
+}
+
+void GLAccelerator::GetResult(const std::string &name, cv::Mat& output)
+{
+	auto program = _programs.at(name);
+
+	program->GetResult(output);
+}
+
+unsigned GLAccelerator::GetResultTexture(const std::string& name)
+{
+	auto program = _programs.at(name);
+
+	return program->GetResultTexture();
+}
+
+void GLProgram::GetResult(cv::Mat& output)
+{
+	_output.GetImage(output);
+}
+
+unsigned int GLProgram::GetResultTexture()
+{
+	return _output.GetTexture();
 }

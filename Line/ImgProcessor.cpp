@@ -40,9 +40,9 @@ cv::Scalar ColorThreshold::High() const
 	return _high;
 }
 
-ImgProcessor::ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary) :
+ImgProcessor::ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, bool accelerated) :
 	_resolution(resolution), _displayEnabled(false), _features(featureLibrary),
-	_trackingFrames(0), _trackedFrames(0)
+	_trackingFrames(0), _trackedFrames(0), _horizon(0.5f)
 {
 	_clahe = createCLAHE();
 	_clahe->setClipLimit(2);
@@ -50,6 +50,20 @@ ImgProcessor::ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary) 
 	memset(&_perf, 0, sizeof(struct Performance));
 	SetSignRatioLimit(0.5f, 2.0f);
 	SetSignAreaLimit(1000, 10000);
+	
+	if(accelerated)
+	{
+		try
+		{
+			_accelerator = new GLAccelerator("shaders/");
+			_accelerator->CreateProgram("cc", _resolution);
+			_accelerator->CreateProgram("thresh", Size(_resolution.width, int(_resolution.height * _horizon)));
+		} catch(GLAcceleratorException &e)
+		{
+			std::cerr << e.what() << std::endl;
+			throw e;
+		}
+	}
 }
 
 ImgProcessor::~ImgProcessor()
@@ -60,27 +74,51 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display)
 {
 	int64 t1, t2;
 
-	// Scaling the image
-	t1 = getTickCount();
-	ScaleFrame(frame);
-	t2 = getTickCount();
-	_perf.pre.scale = t2 - t1;
-
-	// Clone the frame for output
-	t1 = t2;
-	if(_displayEnabled)
+	Mat labFrame, labFrame2;
+	int labGLFrame = 0;
+	// TODO Fix the color conversion. it isn't working and I can't find why.
+	if(!_accelerator.empty() && false)
 	{
-		display = frame.clone();
+		_perf.pre.scale = 0;
+		// Clone the frame for output
+		t1 = getTickCount();
+		if (_displayEnabled)
+		{
+			ScaleFrame(frame, display);
+		}
+		t2 = getTickCount();
+		_perf.pre.display = t2 - t1;
+
+		t1 = t2;
+		_accelerator->ProcessFrame("cc", frame);
+		labGLFrame = _accelerator->GetResultTexture("cc");
+		_accelerator->GetResult("cc", labFrame);
+		labFrame2 = labFrame.clone();
+		t2 = getTickCount();
+		_perf.pre.bgr2lab = t2 - t1;
+	} else
+	{
+		// Scaling the image
+		t1 = getTickCount();
+		ScaleFrame(frame, frame);
+		t2 = getTickCount();
+		_perf.pre.scale = t2 - t1;
+
+		// Clone the frame for output
+		t1 = t2;
+		if (_displayEnabled)
+		{
+			display = frame.clone();
+		}
+		t2 = getTickCount();
+		_perf.pre.display = t2 - t1;
+
+		// Convert the colors to the LAB color space
+		t1 = t2;
+		cvtColor(frame, labFrame, CV_BGR2Lab);
+		t2 = getTickCount();
+		_perf.pre.bgr2lab = t2 - t1;
 	}
-	t2 = getTickCount();
-	_perf.pre.display = t2 - t1;
-	
-	// Convert the colors to the LAB color space
-	t1 = t2;
-	Mat labFrame;
-	cvtColor(frame, labFrame, CV_BGR2Lab);
-	t2 = getTickCount();
-	_perf.pre.bgr2lab = t2 - t1;
 	
 	// illumination correction
 	t1 = t2;
@@ -113,7 +151,7 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display)
 	if(_trackingFrames == _trackedFrames)
 	{
 		_detectedSigns.clear();
-		ProcessSigns(skyImg, skyLumImg, skyDisplay);
+		ProcessSigns(skyImg, labGLFrame, skyLumImg, skyDisplay);
 		_trackedFrames = 0;
 		if (_trackingFrames > 0) // only on first frame
 		{
@@ -131,6 +169,11 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display)
 	}
 
 	UpdatePerf();
+
+	if(!_accelerator.empty())
+	{
+		_accelerator->Update();
+	}
 }
 
 void ImgProcessor::SetHorizon(float horizon)
@@ -157,6 +200,10 @@ const ColorThreshold &ImgProcessor::GetThreshold(FeatureType type)
 void ImgProcessor::SetThreshold(FeatureType type, ColorThreshold thresh)
 {
 	_thresholds[type] = thresh;
+	if(!_accelerator.empty())
+	{
+		//_accelerator->SetThreshold(type, thresh);
+	}
 }
 
 void ImgProcessor::SetSignRatioLimit(float low, float high)
@@ -176,13 +223,17 @@ void ImgProcessor::SetTrackFrames(int frames)
 	_trackingFrames = frames;
 }
 
-void ImgProcessor::ScaleFrame(cv::Mat& frame)
+void ImgProcessor::ScaleFrame(cv::Mat& in, cv::Mat &out)
 {
-	if(frame.cols == _resolution.width && frame.rows == _resolution.height)
+	if(in.cols == _resolution.width && in.rows == _resolution.height)
 	{
+		if(out.data != in.data)
+		{
+			out = in.clone();
+		}
 		return;
 	}
-	resize(frame, frame, _resolution, 0, 0, INTER_LINEAR);
+	resize(in, out, _resolution, 0, 0, INTER_LINEAR);
 }
 
 void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display)
@@ -228,21 +279,43 @@ void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display)
 
 }
 
-void ImgProcessor::ProcessSigns(cv::Mat& frame, cv::Mat &lumFrame, cv::Mat& display)
+void ImgProcessor::ProcessSigns(cv::Mat& frame, int frameGLTex, cv::Mat &lumFrame, cv::Mat& display)
 {
 	int64 t1, t2;
-	//Mat colorFrame;
-	//resize(frame, colorFrame, Size(64,32), 0, 0, INTER_LINEAR);
-
+	
 	// Thresholding
 	t1 = getTickCount();
 	Mat blueMask, redMask, yellowMask;
 	const ColorThreshold &blueThresholds = GetThreshold(FeatureType::BlueSign);
 	const ColorThreshold &redThresholds = GetThreshold(FeatureType::RedSign);
 	const ColorThreshold &yellowThresholds = GetThreshold(FeatureType::YellowSign);
-	inRange(frame, blueThresholds.Low(), blueThresholds.High(), blueMask);
-	inRange(frame, redThresholds.Low(), redThresholds.High(), redMask);
-	inRange(frame, yellowThresholds.Low(), yellowThresholds.High(), yellowMask);
+	if(_accelerator.empty())
+	{
+		inRange(frame, blueThresholds.Low(), blueThresholds.High(), blueMask);
+		inRange(frame, redThresholds.Low(), redThresholds.High(), redMask);
+		inRange(frame, yellowThresholds.Low(), yellowThresholds.High(), yellowMask);
+	} else
+	{
+		_accelerator->SetProgramUniformColor("thresh", "lowBlue", blueThresholds.Low() / 255);
+		_accelerator->SetProgramUniformColor("thresh", "highBlue", blueThresholds.High() / 255);
+		_accelerator->SetProgramUniformColor("thresh", "lowRed", redThresholds.Low() / 255);
+		_accelerator->SetProgramUniformColor("thresh", "highRed", redThresholds.High() / 255);
+		_accelerator->SetProgramUniformColor("thresh", "lowYellow", yellowThresholds.Low() / 255);
+		_accelerator->SetProgramUniformColor("thresh", "highYellow", yellowThresholds.High() / 255);
+		//_accelerator->SetProgramUniform("thresh", "horizon", _horizon);
+		_accelerator->SetProgramUniform("thresh", "horizon", 1);
+		// TODO change back to using directly the openGL texture, also change horizon back
+		//_accelerator->ProcessFrame("thresh", frameGLTex);
+		_accelerator->ProcessFrame("thresh", frame);
+		Mat mask;
+		_accelerator->GetResult("thresh", mask);
+		Mat maskPlanes[3];
+		split(mask, maskPlanes);
+		blueMask = maskPlanes[0];
+		redMask = maskPlanes[1];
+		yellowMask = maskPlanes[2];
+
+	}
 	t2 = getTickCount();
 	_perf.sign.thresh = t2 - t1;
 

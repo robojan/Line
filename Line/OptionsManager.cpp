@@ -5,7 +5,8 @@
 #include <cstdio>
 
 OptionsManager::OptionsManager(int argc, char** argv) :
-	_debug(false), _name(argv[0]), _resolution(640,480), _tracking(false), _horizon(0.5f)
+	_debug(false), _name(argv[0]), _resolution(640,480), _tracking(false), _horizon(0.5f),
+	_acceleration(false)
 {
 	for(auto i = 1; i < argc; i++)
 	{
@@ -15,6 +16,8 @@ OptionsManager::OptionsManager(int argc, char** argv) :
 				printf(GetUsage().c_str());
 				throw std::runtime_error("Showing Help");
 			}
+			else if (strcmp(argv[i], "-a") == 0)
+				_acceleration = true;
 			else if (strcmp(argv[i], "-d") == 0)
 				_debug = true;
 			else if (strcmp(argv[i], "-t") == 0)
@@ -102,6 +105,11 @@ bool OptionsManager::IsTracking() const
 float OptionsManager::GetHorizon() const
 {
 	return _horizon;
+}
+
+bool OptionsManager::IsAccelerated() const
+{
+	return _acceleration;
 }
 
 std::string OptionsManager::GetUsage()

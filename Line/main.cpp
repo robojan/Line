@@ -123,7 +123,7 @@ int main(int argc, char **argv)
 		return 3;
 	}
 
-	ImgProcessor processor(options.GetProcessingResolution(), &library);
+	ImgProcessor processor(options.GetProcessingResolution(), &library, options.IsAccelerated());
 	processor.SetHorizon(options.GetHorizon());
 	processor.EnableDisplay(options.IsDebugMode());
 	processor.SetSignRatioLimit(0.5f, 2.0f);

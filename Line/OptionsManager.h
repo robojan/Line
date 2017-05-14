@@ -27,6 +27,7 @@ public:
 	const cv::Size &GetProcessingResolution() const;
 	bool IsTracking() const;
 	float GetHorizon() const;
+	bool IsAccelerated() const;
 
 	static std::string GetUsage();
 
@@ -38,4 +39,5 @@ private:
 	cv::Size _resolution;
 	bool _tracking;
 	float _horizon;
+	bool _acceleration;
 };
