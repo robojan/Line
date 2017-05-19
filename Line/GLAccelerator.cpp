@@ -8,6 +8,10 @@
 #include <EGL/eglext.h>
 #include <sys/types.h>
 #include <cstdlib>
+
+#ifdef _RASPI
+#include <bcm_host.h>
+#endif
 #endif
 
 #include <iostream>
@@ -33,29 +37,137 @@ static void displayCallback()
 
 #else
 
-void GLAccelerator::CreateX11Window()
+void GLAccelerator::CreateEGLWindow(EGLNativeWindowType win)
 {
-	_x_dpy = XOpenDisplay(NULL);
-	if(!_x_dpy)
+	EGLint attr[] = {
+		EGL_BUFFER_SIZE,16,
+		EGL_RENDERABLE_TYPE,
+		EGL_OPENGL_ES2_BIT,
+		EGL_NONE
+	};
+
+	EGLConfig ecfg;
+	EGLint num_config;
+
+	if (!eglChooseConfig(_egl_dpy, attr, &ecfg, 1, &num_config))
 	{
 		std::stringstream ss;
-		ss << "Couldn't open display " << getenv("DISPLAY");
+		ss << "Failed to choose config(eglError: " << std::hex << eglGetError() << ")";
+		throw ShaderProgramException(ss.str());
+	}
+	if (num_config != 1)
+	{
+		std::stringstream ss;
+		ss << "Didn't get exactly one config, but " << num_config;
 		throw ShaderProgramException(ss.str());
 	}
 
-	_egl_dpy = eglGetDisplay(_x_dpy);
-	if(!_egl_dpy)
+	_egl_surf = eglCreateWindowSurface(_egl_dpy, ecfg, win, NULL);
+	if (_egl_surf == EGL_NO_SURFACE)
+	{
+		std::stringstream ss;
+		ss << "Unable to create EGL surface (eglError: " << std::hex << eglGetError() << ")";
+		throw ShaderProgramException(ss.str());
+	}
+
+	EGLint ctxattr[] = {
+		EGL_CONTEXT_CLIENT_VERSION, 2,
+		EGL_NONE
+	};
+	_egl_ctx = eglCreateContext(_egl_dpy, ecfg, EGL_NO_CONTEXT, ctxattr);
+	if (_egl_ctx == EGL_NO_CONTEXT)
+	{
+		std::stringstream ss;
+		ss << "Unable to create EGL context (eglError: " << std::hex << eglGetError() << ")";
+		throw ShaderProgramException(ss.str());
+	}
+
+	if (!eglMakeCurrent(_egl_dpy, _egl_surf, _egl_surf, _egl_ctx))
+	{
+		std::stringstream ss;
+		ss << "eglMakeCurrent() failed";
+		throw ShaderProgramException(ss.str());
+	}
+}
+
+
+#ifdef _RASPI
+
+void GLAccelerator::CreateWindow()
+{
+	bcm_host_init();
+
+	int major, minor;
+	_egl_dpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+	if (!_egl_dpy)
 	{
 		std::stringstream ss;
 		ss << "eglGetDisplay() failed";
-		throw ShaderProgramException(ss.str());
+		throw GLAcceleratorException(ss.str());
 	}
 
-	if(!eglInitialize(_egl_dpy, NULL, NULL))
+	if (!eglInitialize(_egl_dpy, &major, &minor))
 	{
 		std::stringstream ss;
 		ss << "eglInitialize() failed";
-		throw ShaderProgramException(ss.str());
+		throw GLAcceleratorException(ss.str());
+	}
+	std::cout << "EGL Initialized: " << major << "." << minor << std::endl;
+
+	unsigned int width, height;
+	if(graphics_get_display_size(0,&width, &height) <0)
+	{
+		throw GLAcceleratorException("Could not retrieve display size");
+	}
+	VC_RECT_T dst_rect, src_rect;
+
+	dst_rect.x = 0;
+	dst_rect.y = 0;
+	dst_rect.width = width;
+	dst_rect.height = height;
+
+	src_rect.x = 0;
+	src_rect.y = 0;
+	src_rect.width = width << 16;
+	src_rect.height = height << 16;
+
+	_dispmanDisplay = vc_dispmanx_display_open(0);
+	_dispmanUpdate = vc_dispmanx_update_start(0);
+	_dispmanElement = vc_dispmanx_element_add(_dispmanUpdate, _dispmanDisplay,
+		0, &dst_rect, 0, &src_rect, DISPMANX_PROTECTION_NONE, NULL, NULL, DISPMANX_NO_ROTATE);
+
+	nativewindow.element = _dispmanElement;
+	nativewindow.width = width;
+	nativewindow.height = height;
+	vc_dispmanx_update_submit_sync(_dispmanUpdate);
+
+	CreateEGLWindow(&nativewindow);
+}
+
+#else 
+void GLAccelerator::CreateWindow()
+{
+	_x_dpy = XOpenDisplay(NULL);
+	if (!_x_dpy)
+	{
+		std::stringstream ss;
+		ss << "Couldn't open display " << getenv("DISPLAY");
+		throw GLAcceleratorException(ss.str());
+	}
+
+	_egl_dpy = eglGetDisplay(_x_dpy);
+	if (!_egl_dpy)
+	{
+		std::stringstream ss;
+		ss << "eglGetDisplay() failed";
+		throw GLAcceleratorException(ss.str());
+	}
+
+	if (!eglInitialize(_egl_dpy, NULL, NULL))
+	{
+		std::stringstream ss;
+		ss << "eglInitialize() failed";
+		throw GLAcceleratorException(ss.str());
 	}
 
 	Window root = DefaultRootWindow(_x_dpy);
@@ -82,57 +194,10 @@ void GLAccelerator::CreateX11Window()
 	XMapWindow(_x_dpy, _x_win);
 	XStoreName(_x_dpy, _x_win, "EVC GL accelerator");
 
-	EGLint attr[] = {
-		EGL_BUFFER_SIZE,16,
-		EGL_RENDERABLE_TYPE,
-		EGL_OPENGL_ES2_BIT,
-		EGL_NONE
-	};
-
-	EGLConfig ecfg;
-	EGLint num_config;
-
-	if(!eglChooseConfig(_egl_dpy, attr, &ecfg, 1, &num_config))
-	{
-		std::stringstream ss;
-		ss << "Failed to choose config(eglError: " << std::hex << eglGetError() << ")";
-		throw ShaderProgramException(ss.str());
-	}
-	if(num_config != 1)
-	{
-		std::stringstream ss;
-		ss << "Didn't get exactly one config, but " << num_config; 
-		throw ShaderProgramException(ss.str());
-	}
-
-	_egl_surf = eglCreateWindowSurface(_egl_dpy, ecfg, _x_win, NULL);
-	if( _egl_surf == EGL_NO_SURFACE)
-	{
-		std::stringstream ss;
-		ss << "Unable to create EGL surface (eglError: " << std::hex << eglGetError() << ")";
-		throw ShaderProgramException(ss.str());
-	}
-
-	EGLint ctxattr[] = {
-		EGL_CONTEXT_CLIENT_VERSION, 2,
-		EGL_NONE
-	};
-	_egl_ctx = eglCreateContext(_egl_dpy, ecfg, EGL_NO_CONTEXT, ctxattr);
-	if(_egl_ctx == EGL_NO_CONTEXT)
-	{
-		std::stringstream ss;
-		ss << "Unable to create EGL context (eglError: " << std::hex << eglGetError() << ")";
-		throw ShaderProgramException(ss.str());
-	}
-
-	if(!eglMakeCurrent(_egl_dpy, _egl_surf, _egl_surf, _egl_ctx))
-	{
-		std::stringstream ss;
-		ss << "eglMakeCurrent() failed";
-		throw ShaderProgramException(ss.str());
-	}
-
+	CreateEGLWindow(_x_win);
 }
+#endif
+
 #endif
 
 
@@ -196,7 +261,7 @@ void GLTexture::ReadTexture(const cv::Mat &input)
 		GL_CHECK_ERROR();
 		glBindTexture(GL_TEXTURE_2D, _texture);
 		GL_CHECK_ERROR();
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 		GL_CHECK_ERROR();
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -315,7 +380,7 @@ GLAccelerator::GLAccelerator(const std::string &shaderPath) :
 	}
 	GL_CHECK_ERROR();
 #else
-	CreateX11Window();
+	CreateWindow();
 #endif
 
 	InitGL();

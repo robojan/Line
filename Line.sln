@@ -11,6 +11,10 @@ Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
 		Debug|x64 = Debug|x64
+		RaspberryDebug|ARM = RaspberryDebug|ARM
+		RaspberryDebug|x64 = RaspberryDebug|x64
+		RaspberryRelease|ARM = RaspberryRelease|ARM
+		RaspberryRelease|x64 = RaspberryRelease|x64
 		Release|ARM = Release|ARM
 		Release|x64 = Release|x64
 	EndGlobalSection
@@ -18,12 +22,24 @@ Global
 		{4D566248-12A5-44B7-ABE7-AEE8EE057E4C}.Debug|ARM.ActiveCfg = Debug|x64
 		{4D566248-12A5-44B7-ABE7-AEE8EE057E4C}.Debug|x64.ActiveCfg = Debug|x64
 		{4D566248-12A5-44B7-ABE7-AEE8EE057E4C}.Debug|x64.Build.0 = Debug|x64
+		{4D566248-12A5-44B7-ABE7-AEE8EE057E4C}.RaspberryDebug|ARM.ActiveCfg = Debug|x64
+		{4D566248-12A5-44B7-ABE7-AEE8EE057E4C}.RaspberryDebug|x64.ActiveCfg = Debug|x64
+		{4D566248-12A5-44B7-ABE7-AEE8EE057E4C}.RaspberryDebug|x64.Build.0 = Debug|x64
+		{4D566248-12A5-44B7-ABE7-AEE8EE057E4C}.RaspberryRelease|ARM.ActiveCfg = Release|x64
+		{4D566248-12A5-44B7-ABE7-AEE8EE057E4C}.RaspberryRelease|x64.ActiveCfg = Release|x64
+		{4D566248-12A5-44B7-ABE7-AEE8EE057E4C}.RaspberryRelease|x64.Build.0 = Release|x64
 		{4D566248-12A5-44B7-ABE7-AEE8EE057E4C}.Release|ARM.ActiveCfg = Release|x64
 		{4D566248-12A5-44B7-ABE7-AEE8EE057E4C}.Release|x64.ActiveCfg = Release|x64
 		{4D566248-12A5-44B7-ABE7-AEE8EE057E4C}.Release|x64.Build.0 = Release|x64
 		{BEB70CCB-A2D9-45D9-9CF6-6D531DDAFF74}.Debug|ARM.ActiveCfg = Debug|ARM
 		{BEB70CCB-A2D9-45D9-9CF6-6D531DDAFF74}.Debug|ARM.Build.0 = Debug|ARM
 		{BEB70CCB-A2D9-45D9-9CF6-6D531DDAFF74}.Debug|x64.ActiveCfg = Debug|ARM
+		{BEB70CCB-A2D9-45D9-9CF6-6D531DDAFF74}.RaspberryDebug|ARM.ActiveCfg = RaspberryDebug|ARM
+		{BEB70CCB-A2D9-45D9-9CF6-6D531DDAFF74}.RaspberryDebug|ARM.Build.0 = RaspberryDebug|ARM
+		{BEB70CCB-A2D9-45D9-9CF6-6D531DDAFF74}.RaspberryDebug|x64.ActiveCfg = RaspberryDebug|ARM
+		{BEB70CCB-A2D9-45D9-9CF6-6D531DDAFF74}.RaspberryRelease|ARM.ActiveCfg = RaspberryRelease|ARM
+		{BEB70CCB-A2D9-45D9-9CF6-6D531DDAFF74}.RaspberryRelease|ARM.Build.0 = RaspberryRelease|ARM
+		{BEB70CCB-A2D9-45D9-9CF6-6D531DDAFF74}.RaspberryRelease|x64.ActiveCfg = RaspberryRelease|ARM
 		{BEB70CCB-A2D9-45D9-9CF6-6D531DDAFF74}.Release|ARM.ActiveCfg = Release|ARM
 		{BEB70CCB-A2D9-45D9-9CF6-6D531DDAFF74}.Release|ARM.Build.0 = Release|ARM
 		{BEB70CCB-A2D9-45D9-9CF6-6D531DDAFF74}.Release|x64.ActiveCfg = Release|ARM

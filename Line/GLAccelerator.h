@@ -6,7 +6,11 @@
 #include <map>
 
 #ifndef _WIN32
+
+#ifndef _RASPI
 #include <X11/Xlib.h>
+#endif
+
 #include <EGL/egl.h>
 #endif
 
@@ -55,11 +59,19 @@ private:
 	void LoadVertexShader(const std::string &path);
 	void SetVertexShader(const std::string &source);
 #ifndef _WIN32
-	void CreateX11Window();
+	void CreateWindow();
+	void CreateEGLWindow(EGLNativeWindowType win);
 
 	// X11 variables
+#ifdef _RASPI
+	DISPMANX_ELEMENT_HANDLE_T _dispmanElement;
+	DISPMANX_DISPLAY_HANDLE_T _dispmanDisplay;
+	DISPMANX_UPDATE_HANDLE_T _dispmanUpdate;
+	EGL_DISPMANX_WINDOW_T nativewindow;
+#else
 	Display *_x_dpy;
 	Window _x_win;
+#endif
 	EGLSurface _egl_surf;
 	EGLContext _egl_ctx;
 	EGLDisplay _egl_dpy;

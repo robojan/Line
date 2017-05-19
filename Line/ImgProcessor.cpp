@@ -74,10 +74,9 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display)
 {
 	int64 t1, t2;
 
-	Mat labFrame, labFrame2;
+	Mat labFrame;
 	int labGLFrame = 0;
-	// TODO Fix the color conversion. it isn't working and I can't find why.
-	if(!_accelerator.empty() && false)
+	if(!_accelerator.empty())
 	{
 		_perf.pre.scale = 0;
 		// Clone the frame for output
@@ -93,7 +92,6 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display)
 		_accelerator->ProcessFrame("cc", frame);
 		labGLFrame = _accelerator->GetResultTexture("cc");
 		_accelerator->GetResult("cc", labFrame);
-		labFrame2 = labFrame.clone();
 		t2 = getTickCount();
 		_perf.pre.bgr2lab = t2 - t1;
 	} else
@@ -200,10 +198,6 @@ const ColorThreshold &ImgProcessor::GetThreshold(FeatureType type)
 void ImgProcessor::SetThreshold(FeatureType type, ColorThreshold thresh)
 {
 	_thresholds[type] = thresh;
-	if(!_accelerator.empty())
-	{
-		//_accelerator->SetThreshold(type, thresh);
-	}
 }
 
 void ImgProcessor::SetSignRatioLimit(float low, float high)
@@ -243,7 +237,7 @@ void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display)
 	// Blur
 	t1 = getTickCount();
 	Mat blurred;
-	GaussianBlur(frame, blurred, Size(3,3), 2.5, 2.5, BORDER_DEFAULT);
+	GaussianBlur(frame, blurred, Size(5,5), 10, 10, BORDER_DEFAULT);
 	t2 = getTickCount();
 	_perf.line.blur = t2 - t1;
 
@@ -302,10 +296,10 @@ void ImgProcessor::ProcessSigns(cv::Mat& frame, int frameGLTex, cv::Mat &lumFram
 		_accelerator->SetProgramUniformColor("thresh", "highRed", redThresholds.High() / 255);
 		_accelerator->SetProgramUniformColor("thresh", "lowYellow", yellowThresholds.Low() / 255);
 		_accelerator->SetProgramUniformColor("thresh", "highYellow", yellowThresholds.High() / 255);
-		//_accelerator->SetProgramUniform("thresh", "horizon", _horizon);
-		_accelerator->SetProgramUniform("thresh", "horizon", 1);
+		_accelerator->SetProgramUniform("thresh", "horizon", _horizon);
+		//_accelerator->SetProgramUniform("thresh", "horizon", 1);
 		// TODO change back to using directly the openGL texture, also change horizon back
-		//_accelerator->ProcessFrame("thresh", frameGLTex);
+		_accelerator->ProcessFrame("thresh", frameGLTex);
 		_accelerator->ProcessFrame("thresh", frame);
 		Mat mask;
 		_accelerator->GetResult("thresh", mask);
@@ -447,7 +441,7 @@ float getTimeMs(int64 time)
 
 void ImgProcessor::PrintPerf()
 {	
-	std::cout << GetPerfString(_avgPerf) << std::endl;
+	std::cout << GetPerfString(_perf) << std::endl;
 }
 
 std::string ImgProcessor::GetPerfString(const ImgProcessor::Performance& perf)
