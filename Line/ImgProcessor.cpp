@@ -50,6 +50,7 @@ ImgProcessor::ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, 
 	memset(&_perf, 0, sizeof(struct Performance));
 	SetSignRatioLimit(0.5f, 2.0f);
 	SetSignAreaLimit(1000, 10000);
+	ResetSignCounter();
 	
 	if(accelerated)
 	{
@@ -155,6 +156,7 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display)
 		{
 			StartTracking(skyImg, _detectedSigns);
 		}
+		UpdateSignCounter();
 	} else
 	{
 		_perf.sign.thresh = 0;
@@ -431,6 +433,30 @@ void ImgProcessor::ProcessTracking(cv::Mat& frame, std::vector<track_data_t>& de
 	}
 	t2 = getTickCount();
 	_perf.sign.tracking = t2 - t1;
+}
+
+void ImgProcessor::UpdateSignCounter()
+{
+	for (auto detected : _detectedSigns)
+	{
+		// TODO include size of the sign
+		float val = 1;
+		_signsDetectedCounter[detected.sign] += val;
+		_totalDetectedCounter += val;
+	}
+}
+
+void ImgProcessor::ResetSignCounter()
+{
+	_signsDetectedCounter.clear();
+	_totalDetectedCounter = 0;
+}
+
+void ImgProcessor::GetSignProbabilities(std::map<std::string, float>& out)
+{
+	for (auto signs : _signsDetectedCounter) {
+		out[signs.first] = signs.second / _totalDetectedCounter;
+	}
 }
 
 float getTimeMs(int64 time)

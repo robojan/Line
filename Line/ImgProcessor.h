@@ -48,6 +48,9 @@ public:
 	void SetSignAreaLimit(float low, float high);
 	void SetTrackFrames(int frames);
 	const ColorThreshold &GetThreshold(FeatureType type);
+
+	void ResetSignCounter();
+	void GetSignProbabilities(std::map<std::string, float> &out);
 private:
 	struct Performance {
 		struct {
@@ -85,6 +88,7 @@ private:
 		std::vector<track_data_t>& detected);
 	void StartTracking(cv::Mat &frame, std::vector<track_data_t> &detected);
 	void ProcessTracking(cv::Mat &frame, std::vector<track_data_t> &detected, cv::Mat& display);
+	void UpdateSignCounter();
 
 	cv::Size _resolution;
 	float _horizon;
@@ -110,6 +114,9 @@ private:
 	std::vector<cv::Ptr<cv::Tracker>> _trackers;
 	std::vector<cv::Rect2d> _trackRegion;
 	std::vector<track_data_t> _detectedSigns;
+
+	std::map<std::string, float> _signsDetectedCounter;
+	float _totalDetectedCounter;
 
 	struct Performance _perf;
 	struct Performance _avgPerf;

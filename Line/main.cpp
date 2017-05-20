@@ -9,6 +9,7 @@
 #include "ImgProcessor.h"
 #include <iomanip>
 #include <iostream>
+#include <string>
 
 using namespace cv;
 
@@ -21,6 +22,20 @@ cv::VideoCapture OpenVideoCapture(std::string device)
 		return cv::VideoCapture(device);
 	}
 	return cv::VideoCapture(deviceNumber);
+}
+
+void DrawSignStats(Mat &display, ImgProcessor &processor)
+{
+	std::map<std::string, float> probs;
+	processor.GetSignProbabilities(probs);
+
+	Point pos = Point(5, 40);
+
+	for(auto sign : probs)
+	{
+		putText(display, sign.first + ": " + std::to_string(sign.second), pos, FONT_HERSHEY_PLAIN, 1, Scalar(0, 0, 255), 1);
+		pos += Point(0, 20);
+	}
 }
 
 void mainLoopSingleFrame(Mat frame, ImgProcessor &processor)
@@ -38,10 +53,13 @@ void mainLoopSingleFrame(Mat frame, ImgProcessor &processor)
 
 		std::ostringstream fpsStream;
 		fpsStream << "FPS: " << std::setprecision(2) << fps;
-		putText(display, fpsStream.str(), Point(5, 20), FONT_HERSHEY_PLAIN, 2, Scalar(0, 0, 255), 2);
 
 		if(!display.empty())
 		{
+			DrawSignStats(display, processor);
+
+			putText(display, fpsStream.str(), Point(5, 20), FONT_HERSHEY_PLAIN, 2, Scalar(0, 0, 255), 2);
+
 			imshow("Output Display", display);
 		}
 		std::cout << fpsStream.str() << std::endl;
@@ -80,9 +98,12 @@ void mainLoopVideo(VideoCapture &video, ImgProcessor &processor)
 		
 		std::ostringstream fpsStream;
 		fpsStream << "FPS: " << std::setprecision(2) << fps;
-		putText(display, fpsStream.str(), Point(5, 20), FONT_HERSHEY_PLAIN, 2, Scalar(0, 0, 255), 2);
 		if (!display.empty())
 		{
+			DrawSignStats(display, processor);
+
+			putText(display, fpsStream.str(), Point(5, 20), FONT_HERSHEY_PLAIN, 2, Scalar(0, 0, 255), 2);
+		
 			imshow("Output Display", display);
 		}
 		std::cout << fpsStream.str() << std::endl;
