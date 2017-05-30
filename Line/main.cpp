@@ -10,6 +10,13 @@
 #include <iomanip>
 #include <iostream>
 #include <string>
+#include "control.h"
+
+#ifdef _WIN32
+#include <Windows.h>
+#else
+#include <unistd.h>
+#endif
 
 using namespace cv;
 
@@ -111,6 +118,18 @@ void mainLoopVideo(VideoCapture &video, ImgProcessor &processor)
 	}
 }
 
+const char *GetCWD()
+{
+	static char cwd[260];
+#ifdef _WIN32
+	GetCurrentDirectoryA(260, cwd);
+	return cwd;
+#else 
+	getcwd(cwd, 1024);
+	return cwd;
+#endif
+}
+
 int main(int argc, char **argv)
 {
 	OptionsManager options(argc, argv);
@@ -123,6 +142,8 @@ int main(int argc, char **argv)
 		{
 			printf("\t%s\n", parameter.c_str());
 		}
+
+		printf("Current working dir: %s\n", GetCWD());
 	}
 
 	printf("Loading feature library\n");
@@ -153,6 +174,12 @@ int main(int argc, char **argv)
 	processor.SetThreshold(FeatureType::RedSign, ColorThreshold(Scalar(0, 170, 138), Scalar(255, 180, 155)));
 	processor.SetThreshold(FeatureType::YellowSign, ColorThreshold(Scalar(0, 145, 190), Scalar(255, 160, 210)));
 	processor.SetTrackFrames(options.IsTracking() ? 30 * 1 : 0);
+
+	if (options.GetControlDevice().empty()) {
+		fprintf(stdout, "No serial device given. use --serial dev to specify the device\n");
+	}
+
+	Control control(options.GetControlDevice());
 
 	std::string captureDevice = options.GetCaptureDevice();
 	if (captureDevice.empty())

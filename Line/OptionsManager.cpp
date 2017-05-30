@@ -22,6 +22,15 @@ OptionsManager::OptionsManager(int argc, char** argv) :
 				_debug = true;
 			else if (strcmp(argv[i], "-t") == 0)
 				_tracking = true;
+			else if (strcmp(argv[i], "--serial") == 0)
+			{
+				if (argc - 1 == i || argv[i + 1][0] == '-')
+				{
+					throw std::runtime_error("Capture device must be specified after -c option");
+				}
+				i++;
+				_controlDevice = argv[i];
+			}
 			else if (strcmp(argv[i], "-c") == 0)
 			{
 				if(argc - 1 == i || argv[i+1][0] == '-')
@@ -110,6 +119,11 @@ float OptionsManager::GetHorizon() const
 bool OptionsManager::IsAccelerated() const
 {
 	return _acceleration;
+}
+
+const std::string& OptionsManager::GetControlDevice() const
+{
+	return _controlDevice;
 }
 
 std::string OptionsManager::GetUsage()

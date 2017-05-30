@@ -90,6 +90,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Control.cpp" />
     <ClCompile Include="FeatureLibrary.cpp" />
     <ClCompile Include="GLAccelerator.cpp" />
     <ClCompile Include="ImgProcessor.cpp" />
@@ -97,6 +98,7 @@
     <ClCompile Include="OptionsManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="control.h" />
     <ClInclude Include="FeatureLibrary.h" />
     <ClInclude Include="GLAccelerator.h" />
     <ClInclude Include="ImgProcessor.h" />

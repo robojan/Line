@@ -65,17 +65,21 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <AdditionalSourcesToCopyMapping>resources/shaders/vert.glsl;resources/shaders/cc.glsl;resources/shaders/thresh.glsl;$(AdditionalSourcesToCopyMapping)</AdditionalSourcesToCopyMapping>
+    <IncludePath>C:\LinuxInclude\include\arm-linux-gnueabihf;C:\LinuxInclude\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RaspberryDebug|ARM'">
     <AdditionalSourcesToCopyMapping>resources/shaders/vert.glsl;resources/shaders/cc.glsl;resources/shaders/thresh.glsl;$(AdditionalSourcesToCopyMapping)</AdditionalSourcesToCopyMapping>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
     <AdditionalSourcesToCopyMapping>resources/shaders/vert.glsl;resources/shaders/cc.glsl;resources/shaders/thresh.glsl;$(AdditionalSourcesToCopyMapping)</AdditionalSourcesToCopyMapping>
+    <IncludePath>C:\LinuxInclude\include\arm-linux-gnueabihf;C:\LinuxInclude\include;$(IncludePath)</IncludePath>
+    <RemoteLdToolExe>g++</RemoteLdToolExe>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RaspberryRelease|ARM'">
     <AdditionalSourcesToCopyMapping>resources/shaders/vert.glsl;resources/shaders/cc.glsl;resources/shaders/thresh.glsl;$(AdditionalSourcesToCopyMapping)</AdditionalSourcesToCopyMapping>
   </PropertyGroup>
   <ItemGroup>
+    <ClCompile Include="Control.cpp" />
     <ClCompile Include="FeatureLibrary.cpp" />
     <ClCompile Include="GLAccelerator.cpp" />
     <ClCompile Include="ImgProcessor.cpp" />
@@ -83,12 +87,47 @@
     <ClCompile Include="OptionsManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="control.h" />
     <ClInclude Include="FeatureLibrary.h" />
     <ClInclude Include="GLAccelerator.h" />
     <ClInclude Include="ImgProcessor.h" />
     <ClInclude Include="OptionsManager.h" />
   </ItemGroup>
-  <ItemDefinitionGroup />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
+    <ClCompile>
+      <RelaxIEEE>true</RelaxIEEE>
+      <AdditionalOptions>-pthread %(AdditionalOptions)</AdditionalOptions>
+      <PreprocessorDefinitions>NDEBUG;_REENTRANT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link />
+    <Link>
+      <LibraryDependencies>pthread;%(LibraryDependencies)</LibraryDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
+    <Link>
+      <LibraryDependencies>pthread;%(LibraryDependencies)</LibraryDependencies>
+    </Link>
+    <ClCompile>
+      <PreprocessorDefinitions>_REENTRANT</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RaspberryDebug|ARM'">
+    <Link>
+      <LibraryDependencies>pthread;%(LibraryDependencies)</LibraryDependencies>
+    </Link>
+    <ClCompile>
+      <PreprocessorDefinitions>_RASPI;_REENTRANT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RaspberryRelease|ARM'">
+    <Link>
+      <LibraryDependencies>pthread;%(LibraryDependencies)</LibraryDependencies>
+    </Link>
+    <ClCompile>
+      <PreprocessorDefinitions>_RASPI;_REENTRANT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
 </Project>

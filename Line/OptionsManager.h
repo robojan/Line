@@ -28,6 +28,7 @@ public:
 	bool IsTracking() const;
 	float GetHorizon() const;
 	bool IsAccelerated() const;
+	const std::string &GetControlDevice() const;
 
 	static std::string GetUsage();
 
@@ -40,4 +41,5 @@ private:
 	bool _tracking;
 	float _horizon;
 	bool _acceleration;
+	std::string _controlDevice;
 };
