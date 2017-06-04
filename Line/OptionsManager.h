@@ -20,6 +20,9 @@ public:
 	 */
 	~OptionsManager();
 
+	void ReadConfigFile(const char* path);
+	void WriteConfigFile(const char* path);
+
 	bool IsDebugMode() const;
 	const std::string &GetName() const;
 	const std::vector<std::string> &GetParameters() const;
@@ -29,6 +32,11 @@ public:
 	float GetHorizon() const;
 	bool IsAccelerated() const;
 	const std::string &GetControlDevice() const;
+	int GetBaudRate() const;
+	const cv::Mat &GetCameraCorrectionMatrix() const;
+	const cv::Mat &GetCameraCorrectionDist() const;
+	const cv::Mat &GetIPTMatrix() const;
+
 
 	static std::string GetUsage();
 
@@ -42,4 +50,8 @@ private:
 	float _horizon;
 	bool _acceleration;
 	std::string _controlDevice;
+	cv::Mat _cameraCorrMat;
+	cv::Mat _cameraCorrDist;
+	cv::Mat _iptMat;
+	int _baudRate;
 };

@@ -5,9 +5,12 @@
 #include <cstdio>
 
 OptionsManager::OptionsManager(int argc, char** argv) :
-	_debug(false), _name(argv[0]), _resolution(640,480), _tracking(false), _horizon(0.5f),
-	_acceleration(false)
+	_debug(false), _name(argv[0]), _resolution(640, 480), _tracking(false), _horizon(0.5f),
+	_acceleration(false), _cameraCorrMat(cv::Mat::eye(3, 3, CV_32F)),
+	_cameraCorrDist(cv::Mat::zeros(5, 1, CV_32F)), _iptMat(cv::Mat::eye(3, 3, CV_32F)),
+	_baudRate(115200)
 {
+	WriteConfigFile("Default_config.xml");
 	for(auto i = 1; i < argc; i++)
 	{
 		if(argv[i][0] == '-')
@@ -70,6 +73,15 @@ OptionsManager::OptionsManager(int argc, char** argv) :
 				_resolution.width = width > 0 ? width : 640;
 				_resolution.height = height > 0 ? height : 480;
 			}
+			else if(strcmp(argv[i], "-f") == 0)
+			{
+				if (argc - 1 == i || argv[i + 1][0] == '-')
+				{
+					throw std::runtime_error("Configuration file must be specified after -f option");
+				}
+				i++;
+				ReadConfigFile(argv[i]);
+			}
 		} else
 		{
 			_parameters.push_back(std::string(argv[i]));
@@ -79,6 +91,50 @@ OptionsManager::OptionsManager(int argc, char** argv) :
 
 OptionsManager::~OptionsManager()
 {
+}
+
+void OptionsManager::ReadConfigFile(const char* path)
+{
+	cv::FileStorage fs(path, cv::FileStorage::READ);
+	if(!fs.isOpened())
+	{
+		throw std::runtime_error("Could not open configuration file.");
+	}
+	cv::String captureDev = _captureDevice;
+	cv::read(fs["Input"], captureDev, captureDev);
+	_captureDevice = captureDev;
+	cv::read(fs["Resolution"], _resolution, _resolution);
+	cv::read(fs["Horizon"], _horizon, _horizon);
+	cv::read(fs["CameraCorrMat"], _cameraCorrMat, _cameraCorrMat);
+	cv::read(fs["CameraCorrDist"], _cameraCorrDist, _cameraCorrDist);
+	cv::read(fs["IPT"], _iptMat, _iptMat);
+	cv::read(fs["Tracking"], _tracking, _tracking);
+	cv::read(fs["Acceleration"], _acceleration, _acceleration);
+	cv::read(fs["Debug"], _debug, _debug);
+	cv::String controlDevice = _controlDevice;
+	cv::read(fs["ControlDevice"], controlDevice, controlDevice);
+	_controlDevice = controlDevice;
+	cv::read(fs["BaudRate"], _baudRate, _baudRate);
+}
+
+void OptionsManager::WriteConfigFile(const char* path)
+{
+	cv::FileStorage fs(path, cv::FileStorage::WRITE);
+	if (!fs.isOpened())
+	{
+		throw std::runtime_error("Could not open configuration file.");
+	}
+	fs << "Input" << _captureDevice;
+	fs << "Resolution" << _resolution;
+	fs << "Horizon" << _horizon;
+	fs << "CameraCorrMat" << _cameraCorrMat;
+	fs << "CameraCorrDist" << _cameraCorrDist;
+	fs << "IPT" << _iptMat;
+	fs << "Tracking" << false;
+	fs << "Acceleration" << false;
+	fs << "Debug" << false;
+	fs << "ControlDevice" << _controlDevice;
+	fs << "BaudRate" << _baudRate;
 }
 
 bool OptionsManager::IsDebugMode() const
@@ -126,11 +182,32 @@ const std::string& OptionsManager::GetControlDevice() const
 	return _controlDevice;
 }
 
+int OptionsManager::GetBaudRate() const
+{
+	return _baudRate;
+}
+
+const cv::Mat& OptionsManager::GetCameraCorrectionMatrix() const
+{
+	return _cameraCorrMat;
+}
+
+const cv::Mat& OptionsManager::GetCameraCorrectionDist() const
+{
+	return _cameraCorrDist;
+}
+
+const cv::Mat& OptionsManager::GetIPTMatrix() const
+{
+	return _iptMat;
+}
+
 std::string OptionsManager::GetUsage()
 {
 	return "-h\t\tShow this help\n"
 		"-d\t\tEnter debugging mode\n"
 		"-c dev\tUse capture device\n"
 		"-r widthxheight\tSet the resolution of the capture device\n"
-		"-s horizon\tSet the horizon in the range of 0 - 1\n";
+		"-s horizon\tSet the horizon in the range of 0 - 1\n"
+		"-f Read configuration from file\n";
 }
