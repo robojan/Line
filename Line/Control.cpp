@@ -14,8 +14,8 @@
 
 #ifdef _WIN32
 
-Control::Control(const std::string & dev) :
-	_devPath(dev)
+Control::Control(const std::string & dev, int baud) :
+	_devPath(dev), _baud(baud)
 {
 
 }
@@ -57,7 +57,7 @@ float Control::GetEnergyOut()
 
 #else
 Control::Control(const std::string & dev) :
-	_devPath(dev), _fd(-1), _running(true)
+	_devPath(dev), _baud(baud), _fd(-1), _running(true)
 {
 	if (!dev.empty()) {
 		Connect();
@@ -126,8 +126,8 @@ void Control::Connect()
 	tio.c_cc[VMIN] = 0;
 	tio.c_cc[VTIME] = 1;
 
-	cfsetispeed(&tio, 9600);
-	cfsetospeed(&tio, 9600);
+	cfsetispeed(&tio, _baud);
+	cfsetospeed(&tio, _baud);
 
 	tcsetattr(fd, TCSANOW, &tio);
 	_fd = fd;

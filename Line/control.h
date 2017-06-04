@@ -29,7 +29,7 @@ public:
 
 class Control {
 public:
-	Control(const std::string &dev);
+	Control(const std::string &dev, int baud);
 	~Control();
 
 	bool IsConnected();
@@ -43,6 +43,7 @@ public:
 	float GetEnergyOut();
 private:
 	std::string _devPath;
+	int _baud;
 #ifndef _WIN32
 	void Connect();
 	void SendMessage(const std::string &msg);
