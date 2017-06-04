@@ -8,7 +8,7 @@ OptionsManager::OptionsManager(int argc, char** argv) :
 	_debug(false), _name(argv[0]), _resolution(640, 480), _tracking(false), _horizon(0.5f),
 	_acceleration(false), _cameraCorrMat(cv::Mat::eye(3, 3, CV_32F)),
 	_cameraCorrDist(cv::Mat::zeros(5, 1, CV_32F)), _iptMat(cv::Mat::eye(3, 3, CV_32F)),
-	_baudRate(115200)
+	_baudRate(115200), _mapSize(200,200), _mapTileSize(100)
 {
 	WriteConfigFile("Default_config.xml");
 	for(auto i = 1; i < argc; i++)
@@ -115,6 +115,8 @@ void OptionsManager::ReadConfigFile(const char* path)
 	cv::read(fs["ControlDevice"], controlDevice, controlDevice);
 	_controlDevice = controlDevice;
 	cv::read(fs["BaudRate"], _baudRate, _baudRate);
+	cv::read(fs["MapSize"], _mapSize, _mapSize);
+	cv::read(fs["MapTileSize"], _mapTileSize, _mapTileSize);
 }
 
 void OptionsManager::WriteConfigFile(const char* path)
@@ -135,6 +137,8 @@ void OptionsManager::WriteConfigFile(const char* path)
 	fs << "Debug" << false;
 	fs << "ControlDevice" << _controlDevice;
 	fs << "BaudRate" << _baudRate;
+	fs << "MapSize" << _mapSize;
+	fs << "MapTileSize" << _mapTileSize;
 }
 
 bool OptionsManager::IsDebugMode() const
@@ -200,6 +204,16 @@ const cv::Mat& OptionsManager::GetCameraCorrectionDist() const
 const cv::Mat& OptionsManager::GetIPTMatrix() const
 {
 	return _iptMat;
+}
+
+const cv::Size& OptionsManager::GetMapSize() const
+{
+	return _mapSize;
+}
+
+float OptionsManager::GetMapTileSize() const
+{
+	return _mapTileSize;
 }
 
 std::string OptionsManager::GetUsage()

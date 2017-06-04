@@ -56,7 +56,7 @@ void mainLoopSingleFrame(Mat frame, ImgProcessor &processor)
 		double fps = tickFrequency / (now - lastFrameTime);
 		lastFrameTime = now;
 
-		processor.Process(frame, display);
+		processor.Process(frame, display, Point2f(10000,10000), 0);
 
 		std::ostringstream fpsStream;
 		fpsStream << "FPS: " << std::setprecision(2) << fps;
@@ -101,7 +101,7 @@ void mainLoopVideo(VideoCapture &video, ImgProcessor &processor)
 		if (frame.empty()) {
 			break;
 		}
-		processor.Process(frame, display);
+		processor.Process(frame, display, Point2f(10000,10000), 0);
 		
 		std::ostringstream fpsStream;
 		fpsStream << "FPS: " << std::setprecision(2) << fps;
@@ -165,7 +165,8 @@ int main(int argc, char **argv)
 		return 3;
 	}
 
-	ImgProcessor processor(options.GetProcessingResolution(), &library, options.IsAccelerated());
+	ImgProcessor processor(options.GetProcessingResolution(), &library, options.IsAccelerated(), 
+		options.GetMapSize(), options.GetMapTileSize());
 	processor.SetHorizon(options.GetHorizon());
 	processor.EnableDisplay(options.IsDebugMode());
 	processor.SetSignRatioLimit(0.5f, 2.0f);
@@ -173,6 +174,8 @@ int main(int argc, char **argv)
 	processor.SetThreshold(FeatureType::BlueSign, ColorThreshold(Scalar(0, 130, 92), Scalar(255, 140, 105)));
 	processor.SetThreshold(FeatureType::RedSign, ColorThreshold(Scalar(0, 170, 138), Scalar(255, 180, 155)));
 	processor.SetThreshold(FeatureType::YellowSign, ColorThreshold(Scalar(0, 145, 190), Scalar(255, 160, 210)));
+	processor.SetCameraCorrection(options.GetCameraCorrectionMatrix(), options.GetCameraCorrectionDist());
+	processor.SetIPT(options.GetIPTMatrix());
 	processor.SetTrackFrames(options.IsTracking() ? 30 * 1 : 0);
 
 	if (options.GetControlDevice().empty()) {

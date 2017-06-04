@@ -3,10 +3,12 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
+#include <opencv2/calib3d.hpp>
 
 #include <vector>
 #include <sstream>
 #include <iostream>
+#include <complex.h>
 
 using namespace cv;
 
@@ -40,9 +42,11 @@ cv::Scalar ColorThreshold::High() const
 	return _high;
 }
 
-ImgProcessor::ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, bool accelerated) :
+ImgProcessor::ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, bool accelerated, Size mapSize, float tileSize) :
 	_resolution(resolution), _displayEnabled(false), _features(featureLibrary),
-	_trackingFrames(0), _trackedFrames(0), _horizon(0.5f)
+	_trackingFrames(0), _trackedFrames(0), _horizon(0.5f), 
+	_cameraCorrectionMat(Mat::eye(3, 3, CV_32F)), _cameraCorrectionDist(Mat::zeros(5, 1, CV_32F)),
+	_iptMat(Mat::eye(3, 3, CV_32F)), _map(Mat::zeros(mapSize, CV_32F)), _mapTileSize(tileSize)
 {
 	_clahe = createCLAHE();
 	_clahe->setClipLimit(2);
@@ -52,6 +56,17 @@ ImgProcessor::ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, 
 	SetSignAreaLimit(1000, 10000);
 	ResetSignCounter();
 	
+	std::vector<Point2f> imPoints;
+	std::vector<Point2f> rePoints;
+	imPoints.push_back(Point2f(52, 126-112)); rePoints.push_back(Point2f(-1000, 1500));
+	imPoints.push_back(Point2f(100, 144-112)); rePoints.push_back(Point2f(-500, 1000));
+	imPoints.push_back(Point2f(379, 175-112)); rePoints.push_back(Point2f(500, 500));
+	imPoints.push_back(Point2f(274, 135-112)); rePoints.push_back(Point2f(500, 1500));
+	imPoints.push_back(Point2f(305, 148-112)); rePoints.push_back(Point2f(500, 1000));
+
+	Mat ipt = cv::findHomography(imPoints, rePoints);
+	std::cout << ipt;
+
 	if(accelerated)
 	{
 		try
@@ -71,10 +86,11 @@ ImgProcessor::~ImgProcessor()
 {
 }
 
-void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display)
+void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display, cv::Point2f pos, float angle)
 {
 	int64 t1, t2;
 
+	Mat camCorr;
 	Mat labFrame;
 	int labGLFrame = 0;
 	if(!_accelerator.empty())
@@ -103,18 +119,24 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display)
 		t2 = getTickCount();
 		_perf.pre.scale = t2 - t1;
 
+		// Camera correction
+		t1 = t2;
+		undistort(frame, camCorr, _cameraCorrectionMat, _cameraCorrectionDist);
+		t2 = getTickCount();
+		_perf.pre.cam = t2 - t1;
+
 		// Clone the frame for output
 		t1 = t2;
 		if (_displayEnabled)
 		{
-			display = frame.clone();
+			display = camCorr.clone();
 		}
 		t2 = getTickCount();
 		_perf.pre.display = t2 - t1;
 
 		// Convert the colors to the LAB color space
 		t1 = t2;
-		cvtColor(frame, labFrame, CV_BGR2Lab);
+		cvtColor(camCorr, labFrame, CV_BGR2Lab);
 		t2 = getTickCount();
 		_perf.pre.bgr2lab = t2 - t1;
 	}
@@ -135,7 +157,7 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display)
 	_perf.pre.split = t2 - t1;
 
 	// Process the rest
-	ProcessLines(streetImg, streetDisplay);
+	ProcessLines(streetImg, streetDisplay, pos, angle);
 	if(_trackingFrames == _trackedFrames)
 	{
 		_detectedSigns.clear();
@@ -208,6 +230,17 @@ void ImgProcessor::SetTrackFrames(int frames)
 	_trackingFrames = frames;
 }
 
+void ImgProcessor::SetCameraCorrection(const cv::Mat& matrix, const cv::Mat& dist)
+{
+	_cameraCorrectionMat = matrix;
+	_cameraCorrectionDist = dist;
+}
+
+void ImgProcessor::SetIPT(const cv::Mat& matrix)
+{
+	_iptMat = matrix;
+}
+
 void ImgProcessor::ScaleFrame(cv::Mat& in, cv::Mat &out)
 {
 	if(in.cols == _resolution.width && in.rows == _resolution.height)
@@ -221,7 +254,19 @@ void ImgProcessor::ScaleFrame(cv::Mat& in, cv::Mat &out)
 	resize(in, out, _resolution, 0, 0, INTER_LINEAR);
 }
 
-void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display)
+cv::Point2f operator*(cv::Mat M, const cv::Point2f& p)
+{
+	cv::Mat_<float> src(3/*rows*/, 1 /* cols */);
+
+	src(0, 0) = p.x;
+	src(1, 0) = p.y;
+	src(2, 0) = 1.0;
+
+	cv::Mat_<float> dst = M*src; //USE MATRIX ALGEBRA 
+	return cv::Point2f(dst(1, 0), dst(0, 0));
+}
+
+void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display, cv::Point2f pos, float angle)
 {
 	int64 t1, t2;
 	
@@ -374,8 +419,38 @@ void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display)
 	t2 = getTickCount();
 	_perf.line.drawing = t2 - t1;
 
-	Mat perspective;
-	//warpPerspective(blurred, perspective,)
+	//Mat topdown;
+	//Mat scale = (Mat_<float>(3, 3) << 0.1, 0, 250, 0, -0.1, 1000, 0, 0, 1);
+	Mat robotMat = (Mat_<float>(3, 3) << cos(angle), -sin(angle), pos.x, sin(angle), cos(angle), pos.y, 0, 0, 1);
+	Mat ipt = robotMat * _iptMat;
+	
+	//warpPerspective(display, topdown, ipt, Size(700, 1000));
+	std::vector<Vec4f> tdLines;
+	for (int i = 0; i < lines.size(); i++)
+	{
+		Vec4i &detectedLine = lines[i];
+		std::vector<Point2f> src(2);
+		std::vector<Point2f> dst(2);
+		src[0] = Point2f((float)detectedLine[0], (float)detectedLine[1]);
+		src[1] = Point2f((float)detectedLine[2], (float)detectedLine[3]);
+		perspectiveTransform(src, dst, ipt);
+		Scalar color = Scalar(0, 0, 255);
+		if (dst[0].x < -20000 || dst[0].x > 20000 || dst[0].y < -20000 || dst[0].y > 20000 ||
+			dst[1].x < -20000 || dst[1].x > 20000 || dst[1].y < -20000 || dst[1].y > 20000)
+		{
+			continue;
+		}
+		tdLines.push_back(Vec4f(dst[0].x, dst[0].y, dst[1].x, dst[1].y));
+		//line(topdown, dst[0], dst[1], color, 2, LINE_8, 0);
+	}
+	std::vector<cv::Point2f> visibleRect(4);
+	visibleRect[0] = Point2f(0, 0);
+	visibleRect[1] = Point2f(frame.cols -1, 0);
+	visibleRect[2] = Point2f(frame.cols - 1, frame.rows - 1);
+	visibleRect[3] = Point2f(0, frame.rows - 1);
+	perspectiveTransform(visibleRect, visibleRect, ipt);
+
+	UpdateMap(tdLines, visibleRect);
 
 }
 
@@ -556,6 +631,36 @@ void ImgProcessor::UpdateSignCounter()
 	}
 }
 
+void ImgProcessor::UpdateMap(const std::vector<cv::Vec4f>& lines, const std::vector<cv::Point2f>& visible)
+{
+	Mat newMap = Mat::zeros(_map.cols, _map.rows, CV_32F);
+	for(Vec4f line : lines)
+	{
+		Point2f a(line[0], line[1]); 
+		Point2f b(line[2], line[3]);
+		a /= _mapTileSize;
+		b /= _mapTileSize;
+		cv::line(newMap, a, b, Scalar(1.0f));
+	}
+	addWeighted(_map, 0.8, newMap, 0.2, 0, _map);
+	if(_displayEnabled)
+	{
+		CV_Assert(visible.size() == 4);
+		Mat display;
+		cvtColor(_map, display, CV_GRAY2BGR);
+		Scalar visibleColor(0, 0, 255);
+		line(display, visible[0] / _mapTileSize, visible[1] / _mapTileSize, visibleColor);
+		line(display, visible[1] / _mapTileSize, visible[2] / _mapTileSize, visibleColor);
+		line(display, visible[2] / _mapTileSize, visible[3] / _mapTileSize, visibleColor);
+		line(display, visible[3] / _mapTileSize, visible[0] / _mapTileSize, visibleColor);
+		resize(display, display, Size(_map.cols, _map.rows)*3, 0, 0, INTER_NEAREST);
+		Mat flipped;
+		flip(display, flipped, 0);
+
+		imshow("Map", flipped);
+	}
+}
+
 void ImgProcessor::ResetSignCounter()
 {
 	_signsDetectedCounter.clear();
@@ -585,7 +690,7 @@ std::string ImgProcessor::GetPerfString(const ImgProcessor::Performance& perf)
 	std::stringstream ss;
 
 	int64 pre = perf.pre.scale + perf.pre.display + perf.pre.bgr2lab +
-		perf.pre.split;
+		perf.pre.split + perf.pre.cam;
 	int64 line = perf.line.blur + perf.line.canny + perf.line.hist + 
 		perf.line.mask + perf.line.hough + perf.line.drawing;
 	int64 sign = perf.sign.thresh + perf.sign.erosion + perf.sign.dilation +
@@ -596,6 +701,7 @@ std::string ImgProcessor::GetPerfString(const ImgProcessor::Performance& perf)
 	ss << "Performance:" << getTimeMs(frame) << "ms\n"
 		"\tPreprocessing: " << getTimeMs(pre) << "ms\n"
 		"\t\tscale:      " << getTimeMs(perf.pre.scale) << "ms\n"
+		"\t\tCamera corr:" << getTimeMs(perf.pre.cam) << "ms\n"
 		"\t\tdisplay:    " << getTimeMs(perf.pre.display) << "ms\n"
 		"\t\tbgr2lab:    " << getTimeMs(perf.pre.bgr2lab) << "ms\n"
 		"\t\tsplit:      " << getTimeMs(perf.pre.split) << "ms\n"
@@ -621,6 +727,7 @@ void ImgProcessor::UpdatePerf()
 {
 	// Preprocessing
 	_avgPerf.pre.scale = (_avgPerf.pre.scale * 3 + _perf.pre.scale) / 4;
+	_avgPerf.pre.cam = (_avgPerf.pre.cam * 3 + _perf.pre.cam) / 4;
 	_avgPerf.pre.display = (_avgPerf.pre.display * 3 + _perf.pre.display) / 4;
 	_avgPerf.pre.bgr2lab = (_avgPerf.pre.bgr2lab * 3 + _perf.pre.bgr2lab) / 4;
 	_avgPerf.pre.split = (_avgPerf.pre.split * 3 + _perf.pre.split) / 4;

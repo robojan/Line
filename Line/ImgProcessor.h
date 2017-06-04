@@ -34,10 +34,10 @@ class ImgProcessor
 {
 public:
 
-	ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, bool accelerated);
+	ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, bool accelerated, cv::Size mapSize, float tileSize);
 	~ImgProcessor();
 
-	void Process(cv::Mat &frame, cv::Mat &display);
+	void Process(cv::Mat &frame, cv::Mat &display, cv::Point2f pos, float angle);
 
 	void PrintPerf();
 
@@ -47,6 +47,8 @@ public:
 	void SetSignRatioLimit(float low, float high);
 	void SetSignAreaLimit(float low, float high);
 	void SetTrackFrames(int frames);
+	void SetCameraCorrection(const cv::Mat &matrix, const cv::Mat &dist);
+	void SetIPT(const cv::Mat &matrix);
 	const ColorThreshold &GetThreshold(FeatureType type);
 
 	void ResetSignCounter();
@@ -55,6 +57,7 @@ private:
 	struct Performance {
 		struct {
 			int64 scale;
+			int64 cam;
 			int64 display;
 			int64 bgr2lab;
 			int64 split;
@@ -80,7 +83,7 @@ private:
 	std::string GetPerfString(const struct ImgProcessor::Performance &perf);
 	void UpdatePerf();
 	void ScaleFrame(cv::Mat& in, cv::Mat &out);
-	void ProcessLines(cv::Mat &frame, cv::Mat &display);
+	void ProcessLines(cv::Mat &frame, cv::Mat &display, cv::Point2f pos, float angle);
 	void ProcessSigns(cv::Mat &frame, int frameGLTex, cv::Mat &display);
 	void ProcessSignContour(cv::Mat& frame, cv::Mat& display,
 		const std::vector<std::vector<cv::Point>>& contours,
@@ -90,10 +93,14 @@ private:
 	void StartTracking(cv::Mat &frame, std::vector<track_data_t> &detected);
 	void ProcessTracking(cv::Mat &frame, std::vector<track_data_t> &detected, cv::Mat& display);
 	void UpdateSignCounter();
+	void UpdateMap(const std::vector<cv::Vec4f> &lines, const std::vector<cv::Point2f>& visible);
 
 	cv::Size _resolution;
 	float _horizon;
 	bool _displayEnabled;
+	cv::Mat _cameraCorrectionMat;
+	cv::Mat _cameraCorrectionDist;
+	cv::Mat _iptMat;
 	std::map<FeatureType, ColorThreshold> _thresholds;
 	struct
 	{
@@ -115,6 +122,8 @@ private:
 	std::vector<cv::Ptr<cv::Tracker>> _trackers;
 	std::vector<cv::Rect2d> _trackRegion;
 	std::vector<track_data_t> _detectedSigns;
+	cv::Mat _map;
+	float _mapTileSize;
 
 	std::map<std::string, float> _signsDetectedCounter;
 	float _totalDetectedCounter;
