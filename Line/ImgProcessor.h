@@ -57,11 +57,12 @@ private:
 			int64 scale;
 			int64 display;
 			int64 bgr2lab;
-			int64 illumCorr;
 			int64 split;
 		} pre;
 		struct {
 			int64 blur;
+			int64 hist;
+			int64 mask;
 			int64 canny;
 			int64 hough;
 			int64 drawing;
@@ -80,7 +81,7 @@ private:
 	void UpdatePerf();
 	void ScaleFrame(cv::Mat& in, cv::Mat &out);
 	void ProcessLines(cv::Mat &frame, cv::Mat &display);
-	void ProcessSigns(cv::Mat &frame, int frameGLTex, cv::Mat &lumFrame, cv::Mat &display);
+	void ProcessSigns(cv::Mat &frame, int frameGLTex, cv::Mat &display);
 	void ProcessSignContour(cv::Mat& frame, cv::Mat& display,
 		const std::vector<std::vector<cv::Point>>& contours,
 		const std::vector<cv::Vec4i>& hierarchy,

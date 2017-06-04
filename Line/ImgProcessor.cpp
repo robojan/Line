@@ -118,16 +118,6 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display)
 		t2 = getTickCount();
 		_perf.pre.bgr2lab = t2 - t1;
 	}
-	
-	// illumination correction
-	t1 = t2;
-	Mat illumCorrected;
-	std::vector<cv::Mat> illumCorrectedPlanes(3);
-	split(labFrame, illumCorrectedPlanes);
-	_clahe->apply(illumCorrectedPlanes[0], illumCorrectedPlanes[0]);
-	merge(illumCorrectedPlanes, illumCorrected);
-	t2 = getTickCount();
-	_perf.pre.illumCorr = t2 - t1;
 
 	// Split the frame
 	t1 = t2;
@@ -139,9 +129,8 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display)
 		skyDisplay = display(Range(0, horizon), Range::all());
 		streetDisplay = display(Range(horizon, _resolution.height), Range::all());
 	}
-	Mat streetImg = illumCorrectedPlanes[0](Range(horizon, _resolution.height), Range::all());
-	Mat skyImg = illumCorrected(Range(0, horizon), Range::all());
-	Mat skyLumImg = illumCorrectedPlanes[0](Range(0, horizon), Range::all());
+	Mat streetImg = labFrame(Range(horizon, _resolution.height), Range::all());
+	Mat skyImg = labFrame(Range(0, horizon), Range::all());
 	t2 = getTickCount();
 	_perf.pre.split = t2 - t1;
 
@@ -150,7 +139,7 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display)
 	if(_trackingFrames == _trackedFrames)
 	{
 		_detectedSigns.clear();
-		ProcessSigns(skyImg, labGLFrame, skyLumImg, skyDisplay);
+		ProcessSigns(skyImg, labGLFrame, skyDisplay);
 		_trackedFrames = 0;
 		if (_trackingFrames > 0) // only on first frame
 		{
@@ -236,36 +225,151 @@ void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display)
 {
 	int64 t1, t2;
 	
+	// split
+	Mat planes[3];
+	Mat &LPlane = planes[0];
+	split(frame, planes);
+
 	// Blur
 	t1 = getTickCount();
 	Mat blurred;
-	GaussianBlur(frame, blurred, Size(5,5), 10, 10, BORDER_DEFAULT);
+	GaussianBlur(LPlane, blurred, Size(3, 3), 5, 5, BORDER_DEFAULT);
 	t2 = getTickCount();
 	_perf.line.blur = t2 - t1;
+
+	// Background subtraction
+	t1 = t2;
+	Mat hist;
+	int histSize = 8;
+	float range[] = { 0, 256 };
+	const float *histRange = { range };
+	calcHist(&blurred, 1, NULL, Mat(), (OutputArray)hist, 1, &histSize, &histRange, true, false);
+	int loBin, hiBin;
+	float loCount, hiCount;
+	loCount = hiCount = hist.at<float>();
+	loBin = hiBin = 0;
+	float binSize = range[1] / histSize;
+	for(int i = 1; i < histSize; i++)
+	{
+		float val = hist.at<float>(i);
+		if (val < loCount) {
+			loCount = val;
+			loBin = i;
+		}
+		if (val > hiCount) {
+			hiCount = val;
+			hiBin = i;
+		}
+	}
+	
+	if (hiBin == 0) hiBin++;
+	int loVal = int(((hiBin - 1) * binSize) + 0.5f);
+	int hiVal = int(((hiBin + 1) * binSize)  + 0.5f);
+	t2 = getTickCount();
+	_perf.line.hist = t2 - t1;
+
+	// Masking
+	t1 = t2;
+	Mat mask;
+	//inRange(blurred, loVal, hiVal, mask);
+	threshold(blurred, mask, loVal, 255, THRESH_BINARY);
+	
+	dilate(mask, mask, Mat(), Point(-1, -1), 2);
+	//mask = 255 - mask;
+	t2 = getTickCount();
+	_perf.line.mask = t2 - t1;
+
 
 	// Canny
 	t1 = t2;
 	Mat edges;
-	Canny(blurred, edges, 200, 250, 3, false);
+	Canny(mask, edges, 200, 250, 3, false);
 	t2 = getTickCount();
 	_perf.line.canny = t2 - t1;
 
 	// Hough
 	t1 = t2;
 	std::vector<Vec4i> lines;
-	HoughLinesP(edges, lines, 1, CV_PI / 90, 30, 80, 20);
+	HoughLinesP(edges, lines, 1.5, CV_PI / 180, 30, 50, 35);
 	//std::vector<Vec2f> lines;
-	//HoughLines(edges, lines, 1, CV_PI / 180, 250, 0, 0, 0, CV_PI);
+	//HoughLines(edges, lines, 1.5, CV_PI / 180, 50, 0, 0, 0, CV_PI);
 	t2 = getTickCount();
 	_perf.line.hough = t2 - t1;
+
+	/*
+	std::vector<Vec2f> linesParameters(lines.size());
+	float avgRho = 0, avgTheta = 0;
+	int leftLine=-1, rightLine=-1;
+	float leftDist = INFINITY; float rightDist = INFINITY;
+	Point center(frame.cols / 2, frame.rows / 2);
+	for(int i = 0; i < lines.size(); i++)
+	{
+		Vec4i &line = lines[i];
+		Point pt1(line[0], line[1]);
+		Point pt2(line[2], line[3]);
+		float dx = line[2] - line[0];
+		float dy = line[3] - line[1];
+		float rho = abs(pt2.x*pt1.y - pt2.y*pt1.x) / norm(pt2 - pt1);
+		float theta = -atan2(dx, dy);
+		avgRho += rho;
+		avgTheta += theta;
+		float dist = abs(dy*center.x - dx*center.y + pt2.x*pt1.y - pt2.y * pt1.x) /
+			sqrtf(dy*dy + dx*dx);
+		if(pt1.x < center.x && pt2.x < center.x && dist < leftDist)
+		{
+			leftLine = i;
+		}
+		if (pt1.x > center.x && pt2.x > center.x && dist < rightDist)
+		{
+			rightLine = i;
+		}
+		
+		float a = cosf(theta);
+		float b = sinf(theta);
+		double x0 = a * rho;
+		double y0 = b * rho;
+		Point dpA(cvRound(x0 + 1000 * (-b)), cvRound(y0 + 1000 * a));
+		Point dpB(cvRound(x0 - 1000 * (-b)), cvRound(y0 - 1000 * a));
+		cv::line(display, dpA, dpB, Scalar(255, 255, 0), 1, LINE_8, 0);
+		linesParameters[i] = Vec2f(rho, theta);
+	}
+	avgRho /= lines.size();
+	avgTheta /= lines.size();*/
 
 	// Draw the lines
 	t1 = t2;
 	if(_displayEnabled)
 	{
-		for (auto detectedLine : lines) {
-			line(display, Point(detectedLine[0], detectedLine[1]), Point(detectedLine[2], detectedLine[3]), Scalar(255, 0, 0), 3, LINE_8, 0);
+		for (int i = 0; i < lines.size(); i++)
+		{
+			Vec4i &detectedLine = lines[i];
+			Scalar color = Scalar(255, 0, 0);
+			/*if(leftLine == i || rightLine == i)
+			{
+				color = Scalar(0, 255, 0);
+			} else
+			{
+				color = Scalar(255, 0, 0);
+			}*/
+			line(display, Point(detectedLine[0], detectedLine[1]), Point(detectedLine[2], detectedLine[3]), color, 2, LINE_8, 0);
+			/*float theta = lines[i][1];
+			float rho = lines[i][0];
+			float a = cosf(theta);
+			float b = sinf(theta);
+			double x0 = a * rho;
+			double y0 = b * rho;
+			Point avgLineA(cvRound(x0 + 1000 * (-b)), cvRound(y0 + 1000 * a));
+			Point avgLineB(cvRound(x0 - 1000 * (-b)), cvRound(y0 - 1000 * a));
+			line(display, avgLineA, avgLineB, Scalar(255, 255, 0), 3, LINE_8, 0);*/
 		}
+		/*
+		float a = cosf(avgTheta);
+		float b = sinf(avgTheta);
+		double x0 = a * avgRho;
+		double y0 = b * avgRho;
+		Point avgLineA(cvRound(x0 + 1000 * (-b)), cvRound(y0 + 1000 * a));
+		Point avgLineB(cvRound(x0 - 1000 * (-b)), cvRound(y0 - 1000 * a));
+		line(display, avgLineA, avgLineB, Scalar(255, 255, 0), 3, LINE_8, 0);*/
 	}
 	t2 = getTickCount();
 	_perf.line.drawing = t2 - t1;
@@ -275,7 +379,7 @@ void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display)
 
 }
 
-void ImgProcessor::ProcessSigns(cv::Mat& frame, int frameGLTex, cv::Mat &lumFrame, cv::Mat& display)
+void ImgProcessor::ProcessSigns(cv::Mat& frame, int frameGLTex, cv::Mat& display)
 {
 	int64 t1, t2;
 	
@@ -299,8 +403,6 @@ void ImgProcessor::ProcessSigns(cv::Mat& frame, int frameGLTex, cv::Mat &lumFram
 		_accelerator->SetProgramUniformColor("thresh", "lowYellow", yellowThresholds.Low() / 255);
 		_accelerator->SetProgramUniformColor("thresh", "highYellow", yellowThresholds.High() / 255);
 		_accelerator->SetProgramUniform("thresh", "horizon", _horizon);
-		//_accelerator->SetProgramUniform("thresh", "horizon", 1);
-		// TODO change back to using directly the openGL texture, also change horizon back
 		_accelerator->ProcessFrame("thresh", frameGLTex);
 		_accelerator->ProcessFrame("thresh", frame);
 		Mat mask;
@@ -317,17 +419,17 @@ void ImgProcessor::ProcessSigns(cv::Mat& frame, int frameGLTex, cv::Mat &lumFram
 
 	// Erosion
 	t1 = t2;
-	//erode(blueMask, blueMask, Mat(), Point(-1, -1), 1);
-	//erode(redMask, redMask, Mat(), Point(-1, -1), 1);
-	//erode(yellowMask, yellowMask, Mat(), Point(-1, -1), 1);
+	erode(blueMask, blueMask, Mat(), Point(-1, -1), 1);
+	erode(redMask, redMask, Mat(), Point(-1, -1), 1);
+	erode(yellowMask, yellowMask, Mat(), Point(-1, -1), 1);
 	t2 = getTickCount();
 	_perf.sign.erosion = t2 - t1;
 
 	// Dilation
 	t1 = t2;
-	//dilate(blueMask, blueMask, Mat(), Point(-1, -1), 1);
-	//dilate(redMask, redMask, Mat(), Point(-1, -1), 1);
-	//dilate(yellowMask, yellowMask, Mat(), Point(-1, -1), 1);
+	dilate(blueMask, blueMask, Mat(), Point(-1, -1), 3);
+	dilate(redMask, redMask, Mat(), Point(-1, -1), 6);
+	dilate(yellowMask, yellowMask, Mat(), Point(-1, -1), 3);
 	t2 = getTickCount();
 	_perf.sign.dilation = t2 - t1;
 
@@ -340,13 +442,13 @@ void ImgProcessor::ProcessSigns(cv::Mat& frame, int frameGLTex, cv::Mat &lumFram
 	findContours(yellowMask, yellowContours, yellowHierarchy, RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 	t2 = getTickCount();
 	_perf.sign.contour = t2 - t1;
-
+	
 	// Detect signs
 	t1 = t2;
 	_detectedSigns.clear();
-	ProcessSignContour(lumFrame, display, blueContours, blueHierarchy, FeatureType::BlueSign, _detectedSigns);
-	ProcessSignContour(lumFrame, display, redContours, redHierarchy, FeatureType::RedSign, _detectedSigns);
-	ProcessSignContour(lumFrame, display, yellowContours, yellowHierarchy, FeatureType::YellowSign, _detectedSigns);
+	ProcessSignContour(frame, display, blueContours, blueHierarchy, FeatureType::BlueSign, _detectedSigns);
+	ProcessSignContour(frame, display, redContours, redHierarchy, FeatureType::RedSign, _detectedSigns);
+	ProcessSignContour(frame, display, yellowContours, yellowHierarchy, FeatureType::YellowSign, _detectedSigns);
 	t2 = getTickCount();
 	_perf.sign.detect = t2 - t1;
 }
@@ -372,9 +474,17 @@ void ImgProcessor::ProcessSignContour(cv::Mat& frame, cv::Mat& display,
 		float ratio = float(rect.width) / float(rect.height);
 		if (ratio < minRatio || ratio > maxRatio)
 			continue;
+
 		Mat signImage = frame(rect);
+
+		// illumination correction
+		Mat illumCorrectedPlanes[3];
+		Mat &illumCorrectedDebuggerView = illumCorrectedPlanes[0];
+		split(signImage, illumCorrectedPlanes);
+		_clahe->apply(illumCorrectedPlanes[0], illumCorrectedPlanes[0]);
+
 		Mat signEdges;
-		cv::Canny(signImage, signEdges, 150, 200, 3);
+		cv::Canny(illumCorrectedPlanes[0], signEdges, 150, 200, 3);
 		std::string matchStr = _features->FindMatch(type, signEdges);
 		if(!matchStr.empty())
 		{
@@ -475,9 +585,9 @@ std::string ImgProcessor::GetPerfString(const ImgProcessor::Performance& perf)
 	std::stringstream ss;
 
 	int64 pre = perf.pre.scale + perf.pre.display + perf.pre.bgr2lab +
-		perf.pre.illumCorr + perf.pre.split;
-	int64 line = perf.line.blur + perf.line.canny + 
-		perf.line.hough + perf.line.drawing;
+		perf.pre.split;
+	int64 line = perf.line.blur + perf.line.canny + perf.line.hist + 
+		perf.line.mask + perf.line.hough + perf.line.drawing;
 	int64 sign = perf.sign.thresh + perf.sign.erosion + perf.sign.dilation +
 		perf.sign.contour + perf.sign.detect + perf.sign.tracking;
 
@@ -488,10 +598,11 @@ std::string ImgProcessor::GetPerfString(const ImgProcessor::Performance& perf)
 		"\t\tscale:      " << getTimeMs(perf.pre.scale) << "ms\n"
 		"\t\tdisplay:    " << getTimeMs(perf.pre.display) << "ms\n"
 		"\t\tbgr2lab:    " << getTimeMs(perf.pre.bgr2lab) << "ms\n"
-		"\t\tillumCorr:  " << getTimeMs(perf.pre.illumCorr) << "ms\n"
 		"\t\tsplit:      " << getTimeMs(perf.pre.split) << "ms\n"
 		"\tLine detection: " << getTimeMs(line) << "\n"
 		"\t\tblur:       " << getTimeMs(perf.line.blur) << "ms\n"
+		"\t\thistogram:  " << getTimeMs(perf.line.hist) << "ms\n"
+		"\t\tmask:       " << getTimeMs(perf.line.mask) << "ms\n"
 		"\t\tcanny:      " << getTimeMs(perf.line.canny) << "ms\n"
 		"\t\though:      " << getTimeMs(perf.line.hough) << "ms\n"
 		"\t\tdrawing:    " << getTimeMs(perf.line.drawing) << "ms\n"
@@ -512,11 +623,12 @@ void ImgProcessor::UpdatePerf()
 	_avgPerf.pre.scale = (_avgPerf.pre.scale * 3 + _perf.pre.scale) / 4;
 	_avgPerf.pre.display = (_avgPerf.pre.display * 3 + _perf.pre.display) / 4;
 	_avgPerf.pre.bgr2lab = (_avgPerf.pre.bgr2lab * 3 + _perf.pre.bgr2lab) / 4;
-	_avgPerf.pre.illumCorr = (_avgPerf.pre.illumCorr * 3 + _perf.pre.illumCorr) / 4;
 	_avgPerf.pre.split = (_avgPerf.pre.split * 3 + _perf.pre.split) / 4;
 
 	// Line detection
 	_avgPerf.line.blur = (_avgPerf.line.blur * 3 + _perf.line.blur) / 4;
+	_avgPerf.line.hist = (_avgPerf.line.hist * 3 + _perf.line.hist) / 4;
+	_avgPerf.line.mask = (_avgPerf.line.mask * 3 + _perf.line.mask) / 4;
 	_avgPerf.line.canny = (_avgPerf.line.canny * 3 + _perf.line.canny) / 4;
 	_avgPerf.line.hough = (_avgPerf.line.hough * 3 + _perf.line.hough) / 4;
 	_avgPerf.line.drawing = (_avgPerf.line.drawing * 3 + _perf.line.drawing) / 4;

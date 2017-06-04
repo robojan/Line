@@ -4,6 +4,7 @@
 #include <opencv2/features2d.hpp>
 #include <opencv2/xfeatures2d.hpp>
 #include <map>
+#include <opencv2/imgproc.hpp>
 
 
 class ImageReadException : public std::runtime_error {
@@ -53,5 +54,6 @@ private:
 
 	cv::Ptr<cv::xfeatures2d::SURF> _detector;
 	cv::Ptr<cv::DescriptorMatcher> _matcher;
+	cv::Ptr<cv::CLAHE> _clahe;
 	std::map<FeatureType, struct typeInfo> _featuremap;
 };

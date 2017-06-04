@@ -114,7 +114,7 @@ void mainLoopVideo(VideoCapture &video, ImgProcessor &processor)
 			imshow("Output Display", display);
 		}
 		std::cout << fpsStream.str() << std::endl;
-		//processor.PrintPerf();
+		processor.PrintPerf();
 	}
 }
 

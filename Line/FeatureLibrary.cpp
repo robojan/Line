@@ -7,6 +7,8 @@ FeatureLibrary::FeatureLibrary(int minHessian /* = 400 */)
 {
 	_detector = cv::xfeatures2d::SURF::create(minHessian);
 	_matcher = cv::BFMatcher::create(cv::NORM_L2, true);
+	_clahe = cv::createCLAHE();
+	_clahe->setClipLimit(2);
 }
 
 FeatureLibrary::~FeatureLibrary()
@@ -31,10 +33,14 @@ void FeatureLibrary::Add(FeatureType type, const std::string &name, cv::Mat imag
 {
 	struct featureInfo info;
 
-	cv::Canny(image, image, 150, 200, 3);
+	// illumination correction
+	cv::Mat illumCorrected;
+	_clahe->apply(image, illumCorrected);
 
-	_detector->detectAndCompute(image, cv::Mat(), info.keypoints, info.descriptor);
-	info.image = image;
+	cv::Canny(illumCorrected, illumCorrected, 150, 200, 3);
+
+	_detector->detectAndCompute(illumCorrected, cv::Mat(), info.keypoints, info.descriptor);
+	info.image = illumCorrected;
 	_featuremap[type].objects[name] = info;
 }
 
@@ -116,6 +122,7 @@ bool FeatureLibrary::FindMatch(FeatureType type, const std::string name, cv::Inp
 	std::vector<cv::DMatch> matches;
 	struct featureInfo objectInfo = _featuremap.at(type).objects.at(name);
 
+	cv::Mat &debugImage = (cv::Mat &)image;
 	struct featureInfo sceneInfo;
 	_detector->detectAndCompute(image, cv::Mat(), sceneInfo.keypoints, sceneInfo.descriptor);
 
