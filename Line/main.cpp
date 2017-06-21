@@ -170,8 +170,8 @@ int main(int argc, char **argv)
 	processor.SetHorizon(options.GetHorizon());
 	processor.SetSkyLimit(options.GetSkyLimit());
 	processor.EnableDisplay(options.IsDebugMode());
-	processor.SetSignRatioLimit(0.5f, 2.0f);
-	processor.SetSignAreaLimit(100, 5000);
+	processor.SetSignRatioLimit(options.GetSignRatioLimit()[0], options.GetSignRatioLimit()[1]);
+	processor.SetSignAreaLimit(options.GetSignAreaLimit()[0], options.GetSignAreaLimit()[1]);
 	processor.SetThreshold(FeatureType::BlueSign, options.GetColorThreshold(FeatureType::BlueSign));
 	processor.SetThreshold(FeatureType::RedSign, options.GetColorThreshold(FeatureType::RedSign));
 	processor.SetThreshold(FeatureType::YellowSign, options.GetColorThreshold(FeatureType::YellowSign));

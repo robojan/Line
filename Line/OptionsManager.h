@@ -43,6 +43,9 @@ public:
 	const cv::Size &GetMapSize() const;
 	float GetMapTileSize() const;
 	const ColorThreshold &GetColorThreshold(FeatureType type) const;
+	const cv::Vec2f &GetSignAreaLimit() const;
+	const cv::Vec2f &GetSignRatioLimit() const;
+
 
 
 	static std::string GetUsage();
@@ -65,5 +68,7 @@ private:
 	int _baudRate;
 	cv::Size _mapSize;
 	float _mapTileSize;
+	cv::Vec2f _signAreaLimit;
+	cv::Vec2f _signRatioLimit;
 	std::map<FeatureType, ColorThreshold> _thresholds;
 };
