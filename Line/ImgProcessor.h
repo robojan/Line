@@ -42,6 +42,7 @@ public:
 	void PrintPerf();
 
 	void SetHorizon(float horizon);
+	void SetSkyLimit(float skyLimit);
 	void EnableDisplay(bool enabled);
 	void SetThreshold(FeatureType type, ColorThreshold thresh);
 	void SetSignRatioLimit(float low, float high);
@@ -103,6 +104,7 @@ private:
 
 	cv::Size _resolution;
 	float _horizon;
+	float _skylimit;
 	bool _displayEnabled;
 	cv::Mat _cameraCorrectionMat;
 	cv::Mat _cameraCorrectionDist;

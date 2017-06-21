@@ -152,15 +152,17 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display, cv::Point2f pos, fl
 	// Split the frame
 	t1 = t2;
 	int horizon = int(_resolution.height * _horizon);
+	int skyLimit = int(_resolution.height * _skylimit);
 	Mat skyDisplay, streetDisplay;
 	if(_displayEnabled)
 	{
 		line(display, Point(0, horizon), Point(_resolution.width, horizon), Scalar(0, 255, 0), 2, LINE_8, 0);
-		skyDisplay = display(Range(0, horizon), Range::all());
+		if(skyLimit != 0) line(display, Point(0, skyLimit), Point(_resolution.width, skyLimit), Scalar(0, 255, 0), 2, LINE_8, 0);
+		skyDisplay = display(Range(skyLimit, horizon), Range::all());
 		streetDisplay = display(Range(horizon, _resolution.height), Range::all());
 	}
 	Mat streetImg = labFrame(Range(horizon, _resolution.height), Range::all());
-	Mat skyImg = labFrame(Range(0, horizon), Range::all());
+	Mat skyImg = labFrame(Range(skyLimit, horizon), Range::all());
 	t2 = getTickCount();
 	_perf.pre.split = t2 - t1;
 
@@ -198,6 +200,11 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display, cv::Point2f pos, fl
 void ImgProcessor::SetHorizon(float horizon)
 {
 	_horizon = horizon;
+}
+
+void ImgProcessor::SetSkyLimit(float skyLimit)
+{
+	_skylimit = skyLimit;
 }
 
 void ImgProcessor::EnableDisplay(bool enabled)

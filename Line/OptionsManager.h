@@ -32,6 +32,7 @@ public:
 	const cv::Size &GetProcessingResolution() const;
 	bool IsTracking() const;
 	float GetHorizon() const;
+	float GetSkyLimit() const;
 	bool IsAccelerated() const;
 	const std::string &GetControlDevice() const;
 	int GetBaudRate() const;
@@ -54,6 +55,7 @@ private:
 	cv::Size _resolution;
 	bool _tracking;
 	float _horizon;
+	float _skylimit;
 	bool _acceleration;
 	std::string _controlDevice;
 	cv::Mat _cameraCorrMat;

@@ -168,6 +168,7 @@ int main(int argc, char **argv)
 	ImgProcessor processor(options.GetProcessingResolution(), &library, options.IsAccelerated(), 
 		options.GetMapSize(), options.GetMapTileSize());
 	processor.SetHorizon(options.GetHorizon());
+	processor.SetSkyLimit(options.GetSkyLimit());
 	processor.EnableDisplay(options.IsDebugMode());
 	processor.SetSignRatioLimit(0.5f, 2.0f);
 	processor.SetSignAreaLimit(100, 5000);

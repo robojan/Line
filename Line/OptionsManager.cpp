@@ -8,7 +8,8 @@ OptionsManager::OptionsManager(int argc, char** argv) :
 	_debug(false), _name(argv[0]), _resolution(640, 480), _tracking(false), _horizon(0.5f),
 	_acceleration(false), _cameraCorrMat(cv::Mat::eye(3, 3, CV_32F)),
 	_cameraCorrDist(cv::Mat::zeros(5, 1, CV_32F)), _iptMat(cv::Mat::eye(3, 3, CV_32F)),
-	_baudRate(115200), _mapSize(200, 200), _mapTileSize(100), _cameraCorrTSR(cv::Mat::eye(3,3, CV_32F))
+	_baudRate(115200), _mapSize(200, 200), _mapTileSize(100), _cameraCorrTSR(cv::Mat::eye(3,3, CV_32F)),
+	_skylimit(0)
 {
 	_thresholds[FeatureType::BlueSign] = ColorThreshold(cv::Scalar(0, 130, 92), cv::Scalar(255, 140, 105));
 	_thresholds[FeatureType::RedSign] = ColorThreshold(cv::Scalar(0, 170, 138), cv::Scalar(255, 180, 155));
@@ -108,6 +109,7 @@ void OptionsManager::ReadConfigFile(const char* path)
 	_captureDevice = captureDev;
 	cv::read(fs["Resolution"], _resolution, _resolution);
 	cv::read(fs["Horizon"], _horizon, _horizon);
+	cv::read(fs["SkyLimit"], _skylimit, _skylimit);
 	cv::read(fs["CameraCorrMat"], _cameraCorrMat, _cameraCorrMat);
 	cv::read(fs["CameraCorrDist"], _cameraCorrDist, _cameraCorrDist);
 	cv::read(fs["CameraCorrTSR"], _cameraCorrTSR, _cameraCorrTSR);
@@ -144,6 +146,7 @@ void OptionsManager::WriteConfigFile(const char* path)
 	fs << "Input" << _captureDevice;
 	fs << "Resolution" << _resolution;
 	fs << "Horizon" << _horizon;
+	fs << "SkyLimit" << _skylimit;
 	fs << "CameraCorrMat" << _cameraCorrMat;
 	fs << "CameraCorrDist" << _cameraCorrDist;
 	fs << "CameraCorrTSR" << _cameraCorrTSR;
@@ -208,6 +211,11 @@ bool OptionsManager::IsTracking() const
 float OptionsManager::GetHorizon() const
 {
 	return _horizon;
+}
+
+float OptionsManager::GetSkyLimit() const
+{
+	return _skylimit;
 }
 
 bool OptionsManager::IsAccelerated() const
