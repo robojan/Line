@@ -35,6 +35,7 @@ public:
 	int GetBaudRate() const;
 	const cv::Mat &GetCameraCorrectionMatrix() const;
 	const cv::Mat &GetCameraCorrectionDist() const;
+	const cv::Mat &GetCameraCorrectionTSR() const;
 	const cv::Mat &GetIPTMatrix() const;
 	const cv::Size &GetMapSize() const;
 	float GetMapTileSize() const;
@@ -54,6 +55,7 @@ private:
 	std::string _controlDevice;
 	cv::Mat _cameraCorrMat;
 	cv::Mat _cameraCorrDist;
+	cv::Mat _cameraCorrTSR;
 	cv::Mat _iptMat;
 	int _baudRate;
 	cv::Size _mapSize;

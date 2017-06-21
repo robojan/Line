@@ -155,9 +155,9 @@ bool FeatureLibrary::FindMatch(FeatureType type, const std::string name, cv::Inp
 		}
 	}
 
-	cv::Mat img_matches;
-	cv::drawMatches(objectInfo.image, objectInfo.keypoints, image, sceneInfo.keypoints, goodMatches, img_matches,
-		cv::Scalar::all(-1), cv::Scalar::all(-1), std::vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+	//cv::Mat img_matches;
+	//cv::drawMatches(objectInfo.image, objectInfo.keypoints, image, sceneInfo.keypoints, goodMatches, img_matches,
+	//	cv::Scalar::all(-1), cv::Scalar::all(-1), std::vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
 	if (minDist) *minDist = min_dist;
 	if (maxDist) *maxDist = max_dist;
 	if (avgDist) *avgDist = avg_dist;

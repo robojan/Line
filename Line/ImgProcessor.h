@@ -47,7 +47,7 @@ public:
 	void SetSignRatioLimit(float low, float high);
 	void SetSignAreaLimit(float low, float high);
 	void SetTrackFrames(int frames);
-	void SetCameraCorrection(const cv::Mat &matrix, const cv::Mat &dist);
+	void SetCameraCorrection(const cv::Mat &matrix, const cv::Mat &dist, const cv::Mat &tsr);
 	void SetIPT(const cv::Mat &matrix);
 	const ColorThreshold &GetThreshold(FeatureType type);
 
@@ -76,6 +76,11 @@ private:
 			int64 dilation;
 			int64 contour;
 			int64 detect;
+			struct {
+				int64 illumCorrection;
+				int64 canny;
+				int64 match;
+			} detectPart;
 			int64 tracking;
 		} sign;
 	};
@@ -93,13 +98,17 @@ private:
 	void StartTracking(cv::Mat &frame, std::vector<track_data_t> &detected);
 	void ProcessTracking(cv::Mat &frame, std::vector<track_data_t> &detected, cv::Mat& display);
 	void UpdateSignCounter();
-	void UpdateMap(const std::vector<cv::Vec4f> &lines, const std::vector<cv::Point2f>& visible);
+	void UpdateMap(const std::vector<cv::Vec4f> &lines, const std::vector<cv::Point2f>& visible, const cv::Point2f &pos, float angle);
+	void CalculateCameraCorrection();
 
 	cv::Size _resolution;
 	float _horizon;
 	bool _displayEnabled;
 	cv::Mat _cameraCorrectionMat;
 	cv::Mat _cameraCorrectionDist;
+	cv::Mat _cameraCorrectionTSR;
+	cv::Mat _cameraMap1;
+	cv::Mat _cameraMap2;
 	cv::Mat _iptMat;
 	std::map<FeatureType, ColorThreshold> _thresholds;
 	struct

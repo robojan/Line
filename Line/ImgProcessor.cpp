@@ -46,6 +46,7 @@ ImgProcessor::ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, 
 	_resolution(resolution), _displayEnabled(false), _features(featureLibrary),
 	_trackingFrames(0), _trackedFrames(0), _horizon(0.5f), 
 	_cameraCorrectionMat(Mat::eye(3, 3, CV_32F)), _cameraCorrectionDist(Mat::zeros(5, 1, CV_32F)),
+	_cameraCorrectionTSR(Mat::eye(3,3, CV_32F)),
 	_iptMat(Mat::eye(3, 3, CV_32F)), _map(Mat::zeros(mapSize, CV_32F)), _mapTileSize(tileSize)
 {
 	_clahe = createCLAHE();
@@ -55,7 +56,8 @@ ImgProcessor::ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, 
 	SetSignRatioLimit(0.5f, 2.0f);
 	SetSignAreaLimit(1000, 10000);
 	ResetSignCounter();
-	
+	CalculateCameraCorrection();
+
 	std::vector<Point2f> imPoints;
 	std::vector<Point2f> rePoints;
 	imPoints.push_back(Point2f(52, 126-112)); rePoints.push_back(Point2f(-1000, 1500));
@@ -105,6 +107,12 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display, cv::Point2f pos, fl
 		t2 = getTickCount();
 		_perf.pre.display = t2 - t1;
 
+		// Camera correction
+		t1 = t2;
+		remap(frame, camCorr, _cameraMap1, _cameraMap2, INTER_LINEAR, BORDER_TRANSPARENT);
+		t2 = getTickCount();
+		_perf.pre.cam = t2 - t1;
+
 		t1 = t2;
 		_accelerator->ProcessFrame("cc", frame);
 		labGLFrame = _accelerator->GetResultTexture("cc");
@@ -121,7 +129,7 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display, cv::Point2f pos, fl
 
 		// Camera correction
 		t1 = t2;
-		undistort(frame, camCorr, _cameraCorrectionMat, _cameraCorrectionDist);
+		remap(frame, camCorr, _cameraMap1, _cameraMap2, INTER_LINEAR);
 		t2 = getTickCount();
 		_perf.pre.cam = t2 - t1;
 
@@ -230,10 +238,12 @@ void ImgProcessor::SetTrackFrames(int frames)
 	_trackingFrames = frames;
 }
 
-void ImgProcessor::SetCameraCorrection(const cv::Mat& matrix, const cv::Mat& dist)
+void ImgProcessor::SetCameraCorrection(const cv::Mat& matrix, const cv::Mat& dist, const cv::Mat &tsr)
 {
 	_cameraCorrectionMat = matrix;
 	_cameraCorrectionDist = dist;
+	_cameraCorrectionTSR = tsr;
+	CalculateCameraCorrection();
 }
 
 void ImgProcessor::SetIPT(const cv::Mat& matrix)
@@ -252,18 +262,6 @@ void ImgProcessor::ScaleFrame(cv::Mat& in, cv::Mat &out)
 		return;
 	}
 	resize(in, out, _resolution, 0, 0, INTER_LINEAR);
-}
-
-cv::Point2f operator*(cv::Mat M, const cv::Point2f& p)
-{
-	cv::Mat_<float> src(3/*rows*/, 1 /* cols */);
-
-	src(0, 0) = p.x;
-	src(1, 0) = p.y;
-	src(2, 0) = 1.0;
-
-	cv::Mat_<float> dst = M*src; //USE MATRIX ALGEBRA 
-	return cv::Point2f(dst(1, 0), dst(0, 0));
 }
 
 void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display, cv::Point2f pos, float angle)
@@ -445,12 +443,12 @@ void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display, cv::Point2f po
 	}
 	std::vector<cv::Point2f> visibleRect(4);
 	visibleRect[0] = Point2f(0, 0);
-	visibleRect[1] = Point2f(frame.cols -1, 0);
-	visibleRect[2] = Point2f(frame.cols - 1, frame.rows - 1);
-	visibleRect[3] = Point2f(0, frame.rows - 1);
+	visibleRect[1] = Point2f(float(frame.cols - 1), 0);
+	visibleRect[2] = Point2f(float(frame.cols - 1), float(frame.rows - 1));
+	visibleRect[3] = Point2f(0, float(frame.rows - 1));
 	perspectiveTransform(visibleRect, visibleRect, ipt);
 
-	UpdateMap(tdLines, visibleRect);
+	UpdateMap(tdLines, visibleRect, pos, angle);
 
 }
 
@@ -521,6 +519,9 @@ void ImgProcessor::ProcessSigns(cv::Mat& frame, int frameGLTex, cv::Mat& display
 	// Detect signs
 	t1 = t2;
 	_detectedSigns.clear();
+	_perf.sign.detectPart.illumCorrection = 0;
+	_perf.sign.detectPart.canny = 0;
+	_perf.sign.detectPart.match = 0;
 	ProcessSignContour(frame, display, blueContours, blueHierarchy, FeatureType::BlueSign, _detectedSigns);
 	ProcessSignContour(frame, display, redContours, redHierarchy, FeatureType::RedSign, _detectedSigns);
 	ProcessSignContour(frame, display, yellowContours, yellowHierarchy, FeatureType::YellowSign, _detectedSigns);
@@ -539,6 +540,7 @@ void ImgProcessor::ProcessSignContour(cv::Mat& frame, cv::Mat& display,
 	float minArea = _signArea.low;
 	float maxArea = _signArea.high;
 	cv::Scalar color = _features->GetOverlayColor(type);
+	int64 t1, t2;
 
 	for (unsigned int i = 0; i < contours.size(); i++)
 	{
@@ -551,16 +553,28 @@ void ImgProcessor::ProcessSignContour(cv::Mat& frame, cv::Mat& display,
 			continue;
 
 		Mat signImage = frame(rect);
+		
+		t1 = getTickCount();
 
 		// illumination correction
 		Mat illumCorrectedPlanes[3];
 		Mat &illumCorrectedDebuggerView = illumCorrectedPlanes[0];
 		split(signImage, illumCorrectedPlanes);
 		_clahe->apply(illumCorrectedPlanes[0], illumCorrectedPlanes[0]);
+		t2 = getTickCount();
+		_perf.sign.detectPart.illumCorrection = (_perf.sign.detectPart.illumCorrection * 3 + (t2 - t1)) / 4;
 
+		t1 = t2;
 		Mat signEdges;
 		cv::Canny(illumCorrectedPlanes[0], signEdges, 150, 200, 3);
+		t2 = getTickCount();
+		_perf.sign.detectPart.canny = (_perf.sign.detectPart.canny * 3 + (t2 - t1)) / 4;
+
+		t1 = t2;
 		std::string matchStr = _features->FindMatch(type, signEdges);
+		t2 = getTickCount();
+		_perf.sign.detectPart.match = (_perf.sign.detectPart.match * 3 + (t2 - t1)) / 4;
+
 		if(!matchStr.empty())
 		{
 			track_data_t result;
@@ -631,7 +645,7 @@ void ImgProcessor::UpdateSignCounter()
 	}
 }
 
-void ImgProcessor::UpdateMap(const std::vector<cv::Vec4f>& lines, const std::vector<cv::Point2f>& visible)
+void ImgProcessor::UpdateMap(const std::vector<cv::Vec4f>& lines, const std::vector<cv::Point2f>& visible, const Point2f &pos, float angle)
 {
 	Mat newMap = Mat::zeros(_map.cols, _map.rows, CV_32F);
 	for(Vec4f line : lines)
@@ -653,12 +667,26 @@ void ImgProcessor::UpdateMap(const std::vector<cv::Vec4f>& lines, const std::vec
 		line(display, visible[1] / _mapTileSize, visible[2] / _mapTileSize, visibleColor);
 		line(display, visible[2] / _mapTileSize, visible[3] / _mapTileSize, visibleColor);
 		line(display, visible[3] / _mapTileSize, visible[0] / _mapTileSize, visibleColor);
+		display.at<Vec3f>(pos.x / _mapTileSize, pos.y / _mapTileSize) = Vec3f(1, 0, 0);
 		resize(display, display, Size(_map.cols, _map.rows)*3, 0, 0, INTER_NEAREST);
 		Mat flipped;
 		flip(display, flipped, 0);
 
 		imshow("Map", flipped);
 	}
+}
+
+void ImgProcessor::CalculateCameraCorrection()
+{
+	// setup enlargement and offset for new image
+
+	// create a new camera matrix with the principal point 
+	// offest according to the offset above
+	Mat newCameraMatrix = _cameraCorrectionTSR * _cameraCorrectionMat ;
+
+	// create undistortion maps
+	initUndistortRectifyMap(_cameraCorrectionMat, _cameraCorrectionDist, Mat(),
+		newCameraMatrix, _resolution, CV_16SC2, _cameraMap1, _cameraMap2);
 }
 
 void ImgProcessor::ResetSignCounter()
@@ -718,6 +746,9 @@ std::string ImgProcessor::GetPerfString(const ImgProcessor::Performance& perf)
 		"\t\tdilation:   " << getTimeMs(perf.sign.dilation) << "ms\n"
 		"\t\tcontouring: " << getTimeMs(perf.sign.contour) << "ms\n"
 		"\t\tDetection:  " << getTimeMs(perf.sign.detect) << "ms\n"
+		"\t\t\tIllum corr:" << getTimeMs(perf.sign.detectPart.illumCorrection) << "ms\n"
+		"\t\t\tCanny:     " << getTimeMs(perf.sign.detectPart.canny) << "ms\n"
+		"\t\t\tMatch:     " << getTimeMs(perf.sign.detectPart.match) << "ms\n"
 		"\t\tTracking:   " << getTimeMs(perf.sign.tracking) << "ms\n"
 		;
 	return ss.str();

@@ -56,7 +56,7 @@ float Control::GetEnergyOut()
 }
 
 #else
-Control::Control(const std::string & dev) :
+Control::Control(const std::string & dev, int baud) :
 	_devPath(dev), _baud(baud), _fd(-1), _running(true)
 {
 	if (!dev.empty()) {

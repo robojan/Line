@@ -8,7 +8,7 @@ OptionsManager::OptionsManager(int argc, char** argv) :
 	_debug(false), _name(argv[0]), _resolution(640, 480), _tracking(false), _horizon(0.5f),
 	_acceleration(false), _cameraCorrMat(cv::Mat::eye(3, 3, CV_32F)),
 	_cameraCorrDist(cv::Mat::zeros(5, 1, CV_32F)), _iptMat(cv::Mat::eye(3, 3, CV_32F)),
-	_baudRate(115200), _mapSize(200,200), _mapTileSize(100)
+	_baudRate(115200), _mapSize(200, 200), _mapTileSize(100), _cameraCorrTSR(cv::Mat::eye(3,3, CV_32F))
 {
 	WriteConfigFile("Default_config.xml");
 	for(auto i = 1; i < argc; i++)
@@ -107,6 +107,7 @@ void OptionsManager::ReadConfigFile(const char* path)
 	cv::read(fs["Horizon"], _horizon, _horizon);
 	cv::read(fs["CameraCorrMat"], _cameraCorrMat, _cameraCorrMat);
 	cv::read(fs["CameraCorrDist"], _cameraCorrDist, _cameraCorrDist);
+	cv::read(fs["CameraCorrTSR"], _cameraCorrTSR, _cameraCorrTSR);
 	cv::read(fs["IPT"], _iptMat, _iptMat);
 	cv::read(fs["Tracking"], _tracking, _tracking);
 	cv::read(fs["Acceleration"], _acceleration, _acceleration);
@@ -131,6 +132,7 @@ void OptionsManager::WriteConfigFile(const char* path)
 	fs << "Horizon" << _horizon;
 	fs << "CameraCorrMat" << _cameraCorrMat;
 	fs << "CameraCorrDist" << _cameraCorrDist;
+	fs << "CameraCorrTSR" << _cameraCorrTSR;
 	fs << "IPT" << _iptMat;
 	fs << "Tracking" << false;
 	fs << "Acceleration" << false;
@@ -199,6 +201,11 @@ const cv::Mat& OptionsManager::GetCameraCorrectionMatrix() const
 const cv::Mat& OptionsManager::GetCameraCorrectionDist() const
 {
 	return _cameraCorrDist;
+}
+
+const cv::Mat & OptionsManager::GetCameraCorrectionTSR() const
+{
+	return _cameraCorrTSR;
 }
 
 const cv::Mat& OptionsManager::GetIPTMatrix() const

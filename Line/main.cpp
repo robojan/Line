@@ -174,7 +174,8 @@ int main(int argc, char **argv)
 	processor.SetThreshold(FeatureType::BlueSign, ColorThreshold(Scalar(0, 130, 92), Scalar(255, 140, 105)));
 	processor.SetThreshold(FeatureType::RedSign, ColorThreshold(Scalar(0, 170, 138), Scalar(255, 180, 155)));
 	processor.SetThreshold(FeatureType::YellowSign, ColorThreshold(Scalar(0, 145, 190), Scalar(255, 160, 210)));
-	processor.SetCameraCorrection(options.GetCameraCorrectionMatrix(), options.GetCameraCorrectionDist());
+	processor.SetCameraCorrection(options.GetCameraCorrectionMatrix(), options.GetCameraCorrectionDist(),
+		options.GetCameraCorrectionTSR());
 	processor.SetIPT(options.GetIPTMatrix());
 	processor.SetTrackFrames(options.IsTracking() ? 30 * 1 : 0);
 
