@@ -10,6 +10,9 @@ OptionsManager::OptionsManager(int argc, char** argv) :
 	_cameraCorrDist(cv::Mat::zeros(5, 1, CV_32F)), _iptMat(cv::Mat::eye(3, 3, CV_32F)),
 	_baudRate(115200), _mapSize(200, 200), _mapTileSize(100), _cameraCorrTSR(cv::Mat::eye(3,3, CV_32F))
 {
+	_thresholds[FeatureType::BlueSign] = ColorThreshold(cv::Scalar(0, 130, 92), cv::Scalar(255, 140, 105));
+	_thresholds[FeatureType::RedSign] = ColorThreshold(cv::Scalar(0, 170, 138), cv::Scalar(255, 180, 155));
+	_thresholds[FeatureType::YellowSign] = ColorThreshold(cv::Scalar(0, 145, 190), cv::Scalar(255, 160, 210));
 	WriteConfigFile("Default_config.xml");
 	for(auto i = 1; i < argc; i++)
 	{
@@ -118,6 +121,17 @@ void OptionsManager::ReadConfigFile(const char* path)
 	cv::read(fs["BaudRate"], _baudRate, _baudRate);
 	cv::read(fs["MapSize"], _mapSize, _mapSize);
 	cv::read(fs["MapTileSize"], _mapTileSize, _mapTileSize);
+	cv::Scalar low, high;
+	cv::read(fs["ThresholdBlueLow"], low, _thresholds.at(FeatureType::BlueSign).Low());
+	cv::read(fs["ThresholdBlueHigh"], high, _thresholds.at(FeatureType::BlueSign).High());
+	_thresholds[FeatureType::BlueSign] = ColorThreshold(low, high);
+	cv::read(fs["ThresholdYellowLow"], low, _thresholds.at(FeatureType::YellowSign).Low());
+	cv::read(fs["ThresholdYellowHigh"], high, _thresholds.at(FeatureType::YellowSign).High());
+	_thresholds[FeatureType::YellowSign] = ColorThreshold(low, high);
+	cv::read(fs["ThresholdRedLow"], low, _thresholds.at(FeatureType::RedSign).Low());
+	cv::read(fs["ThresholdRedHigh"], high, _thresholds.at(FeatureType::RedSign).High());
+	_thresholds[FeatureType::RedSign] = ColorThreshold(low, high);
+	//cv::read(fs["Thresholds"], _thresholds, _thresholds);
 }
 
 void OptionsManager::WriteConfigFile(const char* path)
@@ -141,6 +155,24 @@ void OptionsManager::WriteConfigFile(const char* path)
 	fs << "BaudRate" << _baudRate;
 	fs << "MapSize" << _mapSize;
 	fs << "MapTileSize" << _mapTileSize;
+	auto it = _thresholds.find(FeatureType::BlueSign);
+	if(it != _thresholds.end())
+	{
+		fs << "ThresholdBlueLow" << it->second.Low();
+		fs << "ThresholdBlueHigh" << it->second.High();
+	}
+	it = _thresholds.find(FeatureType::YellowSign);
+	if (it != _thresholds.end())
+	{
+		fs << "ThresholdYellowLow" << it->second.Low();
+		fs << "ThresholdYellowHigh" << it->second.High();
+	}
+	it = _thresholds.find(FeatureType::RedSign);
+	if (it != _thresholds.end())
+	{
+		fs << "ThresholdRedLow" << it->second.Low();
+		fs << "ThresholdRedHigh" << it->second.High();
+	}
 }
 
 bool OptionsManager::IsDebugMode() const
@@ -221,6 +253,11 @@ const cv::Size& OptionsManager::GetMapSize() const
 float OptionsManager::GetMapTileSize() const
 {
 	return _mapTileSize;
+}
+
+const ColorThreshold& OptionsManager::GetColorThreshold(FeatureType type) const
+{
+	return _thresholds.at(type);
 }
 
 std::string OptionsManager::GetUsage()

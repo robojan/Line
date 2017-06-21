@@ -2,6 +2,8 @@
 #include <string>
 #include <vector>
 #include <opencv2/core.hpp>
+#include <map>
+#include "ImgProcessor.h"
 
 /**
  * \brief 
@@ -39,6 +41,7 @@ public:
 	const cv::Mat &GetIPTMatrix() const;
 	const cv::Size &GetMapSize() const;
 	float GetMapTileSize() const;
+	const ColorThreshold &GetColorThreshold(FeatureType type) const;
 
 
 	static std::string GetUsage();
@@ -60,4 +63,5 @@ private:
 	int _baudRate;
 	cv::Size _mapSize;
 	float _mapTileSize;
+	std::map<FeatureType, ColorThreshold> _thresholds;
 };

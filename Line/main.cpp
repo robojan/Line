@@ -171,9 +171,9 @@ int main(int argc, char **argv)
 	processor.EnableDisplay(options.IsDebugMode());
 	processor.SetSignRatioLimit(0.5f, 2.0f);
 	processor.SetSignAreaLimit(100, 5000);
-	processor.SetThreshold(FeatureType::BlueSign, ColorThreshold(Scalar(0, 130, 92), Scalar(255, 140, 105)));
-	processor.SetThreshold(FeatureType::RedSign, ColorThreshold(Scalar(0, 170, 138), Scalar(255, 180, 155)));
-	processor.SetThreshold(FeatureType::YellowSign, ColorThreshold(Scalar(0, 145, 190), Scalar(255, 160, 210)));
+	processor.SetThreshold(FeatureType::BlueSign, options.GetColorThreshold(FeatureType::BlueSign));
+	processor.SetThreshold(FeatureType::RedSign, options.GetColorThreshold(FeatureType::RedSign));
+	processor.SetThreshold(FeatureType::YellowSign, options.GetColorThreshold(FeatureType::YellowSign));
 	processor.SetCameraCorrection(options.GetCameraCorrectionMatrix(), options.GetCameraCorrectionDist(),
 		options.GetCameraCorrectionTSR());
 	processor.SetIPT(options.GetIPTMatrix());
