@@ -89,7 +89,7 @@ private:
 	std::string GetPerfString(const struct ImgProcessor::Performance &perf);
 	void UpdatePerf();
 	void ScaleFrame(cv::Mat& in, cv::Mat &out);
-	void ProcessLines(cv::Mat &frame, cv::Mat &display, cv::Point2f pos, float angle);
+	void ProcessLines(cv::Mat &frame, cv::Mat &display, int horizon);
 	void ProcessSigns(cv::Mat &frame, int frameGLTex, cv::Mat &display);
 	void ProcessSignContour(cv::Mat& frame, cv::Mat& display,
 		const std::vector<std::vector<cv::Point>>& contours,
@@ -99,8 +99,9 @@ private:
 	void StartTracking(cv::Mat &frame, std::vector<track_data_t> &detected);
 	void ProcessTracking(cv::Mat &frame, std::vector<track_data_t> &detected, cv::Mat& display);
 	void UpdateSignCounter();
-	void UpdateMap(const std::vector<cv::Vec4f> &lines, const std::vector<cv::Point2f>& visible, const cv::Point2f &pos, float angle);
+	void UpdateMap(const std::vector<cv::Vec4f> &lines, const std::vector<cv::Point2f>& visible);
 	void CalculateCameraCorrection();
+	void CreateMapMask();
 
 	cv::Size _resolution;
 	float _horizon;
@@ -134,6 +135,7 @@ private:
 	std::vector<cv::Rect2d> _trackRegion;
 	std::vector<track_data_t> _detectedSigns;
 	cv::Mat _map;
+	cv::Mat _mapMask;
 	float _mapTileSize;
 
 	std::map<std::string, float> _signsDetectedCounter;
