@@ -27,10 +27,10 @@ public:
 	ControlException(const std::string &msg) : std::runtime_error(msg) {}
 };
 
-class Control {
+class Communication {
 public:
-	Control(const std::string &dev, int baud);
-	~Control();
+	Communication(const std::string &dev, int baud);
+	~Communication();
 
 	bool IsConnected();
 

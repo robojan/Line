@@ -198,7 +198,7 @@ int main(int argc, char **argv)
 		fprintf(stdout, "No serial device given. use --serial dev to specify the device\n");
 	}
 
-	Control control(options.GetControlDevice(), options.GetBaudRate());
+	Communication control(options.GetControlDevice(), options.GetBaudRate());
 
 	std::string captureDevice = options.GetCaptureDevice();
 	if (captureDevice.empty())

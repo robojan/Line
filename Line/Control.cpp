@@ -14,62 +14,62 @@
 
 #ifdef _WIN32
 
-Control::Control(const std::string & dev, int baud) :
+Communication::Communication(const std::string & dev, int baud) :
 	_devPath(dev), _baud(baud)
 {
 
 }
 
-Control::~Control()
+Communication::~Communication()
 {
 
 }
 
-bool Control::IsConnected()
+bool Communication::IsConnected()
 {
 	return false;
 }
 
-void Control::Forward(float distance)
+void Communication::Forward(float distance)
 {
 
 }
 
-void Control::Turn(float angle)
+void Communication::Turn(float angle)
 {
 
 }
 
-void Control::Sweep(bool on)
+void Communication::Sweep(bool on)
 {
 
 }
 
-float Control::GetEnergyIn()
+float Communication::GetEnergyIn()
 {
 	return 0;
 }
 
-float Control::GetEnergyOut()
+float Communication::GetEnergyOut()
 {
 	return 0;
 }
 
 #else
-Control::Control(const std::string & dev, int baud) :
+Communication::Communication(const std::string & dev, int baud) :
 	_devPath(dev), _baud(baud), _fd(-1), _running(true)
 {
 	if (!dev.empty()) {
 		Connect();
 	}
-	int status = pthread_create(&_readingThread, NULL, (void *(*)(void*))Control::ReadThread, this);
+	int status = pthread_create(&_readingThread, NULL, (void *(*)(void*))Communication::ReadThread, this);
 	if(status)
 	{
-		throw ControlException("Could not create listening thread: " + std::to_string(status));
+		throw CommunicationException("Could not create listening thread: " + std::to_string(status));
 	}
 }
 
-Control::~Control()
+Communication::~Communication()
 {
 	_running = false;
 	pthread_join(_readingThread, NULL);
@@ -79,43 +79,43 @@ Control::~Control()
 	}
 }
 
-bool Control::IsConnected()
+bool Communication::IsConnected()
 {
 	return _fd >= 0;
 }
 
-void Control::Forward(float distance)
+void Communication::Forward(float distance)
 {
 
 }
 
-void Control::Turn(float angle)
+void Communication::Turn(float angle)
 {
 
 }
 
-void Control::Sweep(bool on)
+void Communication::Sweep(bool on)
 {
 
 }
 
-float Control::GetEnergyIn()
-{
-	return 0;
-}
-
-float Control::GetEnergyOut()
+float Communication::GetEnergyIn()
 {
 	return 0;
 }
 
-void Control::Connect()
+float Communication::GetEnergyOut()
+{
+	return 0;
+}
+
+void Communication::Connect()
 {
 	struct termios tio;
 
 	int fd = open(_devPath.c_str(), O_RDWR | O_NONBLOCK);
 	if (fd < 0) {
-		throw ControlException("Could not open serial device " + _devPath + ": " + strerror(errno));
+		throw CommunicationException("Could not open serial device " + _devPath + ": " + strerror(errno));
 	}
 
 	memset(&tio, 0, sizeof(struct termios));
@@ -132,7 +132,7 @@ void Control::Connect()
 	tcsetattr(fd, TCSANOW, &tio);
 	_fd = fd;
 }
-void Control::SendMessage(const std::string & msg)
+void Communication::SendMessage(const std::string & msg)
 {
 	if (!IsConnected())
 	{
@@ -141,12 +141,12 @@ void Control::SendMessage(const std::string & msg)
 	write(_fd, msg.c_str(), msg.length());
 }
 
-bool Control::GetMessage(std::string & msg)
+bool Communication::GetMessage(std::string & msg)
 {
 	return false;
 }
 
-void Control::Tokenize(std::vector<std::string>& tokens, const std::string & msg)
+void Communication::Tokenize(std::vector<std::string>& tokens, const std::string & msg)
 {
 	int pos = 0;
 	while(true)
@@ -163,7 +163,7 @@ void Control::Tokenize(std::vector<std::string>& tokens, const std::string & msg
 	}
 }
 
-void Control::ProcessMessage(const char *str)
+void Communication::ProcessMessage(const char *str)
 {
 	if (str[0] == '$') {
 		std::string msg(str + 1);
@@ -183,7 +183,7 @@ void Control::ProcessMessage(const char *str)
 	}
 }
 
-void *Control::ReadThread(Control * self)
+void *Communication::ReadThread(Communication * self)
 {
 	std::vector<char> buffer(50);
 	while(self->_running)
