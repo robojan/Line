@@ -35,7 +35,7 @@ class ImgProcessor
 {
 public:
 
-	ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, bool accelerated, cv::Size mapSize, float tileSize, int colorSpace);
+	ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, bool accelerated, cv::Size mapSize, float tileSize, int colorSpace, int lineMode);
 	~ImgProcessor();
 
 	void Process(cv::Mat &frame, cv::Mat &display, cv::Point2f pos, float angle);
@@ -144,6 +144,7 @@ private:
 	cv::Mat _mapMask;
 	float _mapTileSize;
 	int _colorSpace;
+	int _lineMode;
 
 	std::map<std::string, float> _signsDetectedCounter;
 	float _totalDetectedCounter;

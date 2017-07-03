@@ -186,7 +186,7 @@ int main(int argc, char **argv)
 	}
 
 	ImgProcessor processor(options.GetProcessingResolution(), &library, options.IsAccelerated(), 
-		options.GetMapSize(), options.GetMapTileSize(), options.GetColorSpace());
+		options.GetMapSize(), options.GetMapTileSize(), options.GetColorSpace(), options.GetLineMode());
 	processor.SetHorizon(options.GetHorizon());
 	processor.SetSkyLimit(options.GetSkyLimit());
 	processor.EnableDisplay(options.IsDebugMode());

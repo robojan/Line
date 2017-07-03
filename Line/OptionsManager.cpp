@@ -10,7 +10,7 @@ OptionsManager::OptionsManager(int argc, char** argv) :
 	_cameraCorrDist(cv::Mat::zeros(5, 1, CV_32F)), _iptMat(cv::Mat::eye(3, 3, CV_32F)),
 	_baudRate(115200), _mapSize(200, 200), _mapTileSize(10), _cameraCorrTSR(cv::Mat::eye(3, 3, CV_32F)),
 	_skylimit(0), _signAreaLimit(100, 5000), _signRatioLimit(0.75f, 1.5f), _detectorType(0), 
-	_colorSpace(0)
+	_colorSpace(0), _lineMode(0)
 {
 	_thresholds[FeatureType::BlueSign] = ColorThreshold(cv::Scalar(0, 130, 92), cv::Scalar(255, 140, 105));
 	_thresholds[FeatureType::RedSign] = ColorThreshold(cv::Scalar(0, 170, 138), cv::Scalar(255, 180, 155));
@@ -138,6 +138,7 @@ void OptionsManager::ReadConfigFile(const char* path)
 	cv::read(fs["SignAreaLimit"], _signAreaLimit, _signAreaLimit);
 	cv::read(fs["DetectorType"], _detectorType, _detectorType);
 	cv::read(fs["ColorSpace"], _colorSpace, _colorSpace);
+	cv::read(fs["LineMode"], _lineMode, _lineMode);
 }
 
 void OptionsManager::WriteConfigFile(const char* path)
@@ -184,6 +185,7 @@ void OptionsManager::WriteConfigFile(const char* path)
 	fs << "SignRatioLimit" << _signRatioLimit;
 	fs << "DetectorType" << _detectorType;
 	fs << "ColorSpace" << _colorSpace;
+	fs << "LineMode" << _lineMode;
 }
 
 bool OptionsManager::IsDebugMode() const
@@ -304,4 +306,9 @@ const int OptionsManager::GetDetectorType() const
 int OptionsManager::GetColorSpace() const
 {
 	return _colorSpace;
+}
+
+int OptionsManager::GetLineMode() const
+{
+	return _lineMode;
 }

@@ -47,13 +47,14 @@ bool ColorThreshold::isHueWraped() const
 	return _low[0] > _high[0];
 }
 
-ImgProcessor::ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, bool accelerated, Size mapSize, float tileSize, int colorSpace) :
+ImgProcessor::ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, bool accelerated, Size mapSize, float tileSize, int colorSpace, 
+	int lineMode) :
 	_resolution(resolution), _displayEnabled(false), _features(featureLibrary),
 	_trackingFrames(0), _trackedFrames(0), _horizon(0.5f), 
 	_cameraCorrectionMat(Mat::eye(3, 3, CV_32F)), _cameraCorrectionDist(Mat::zeros(5, 1, CV_32F)),
 	_cameraCorrectionTSR(Mat::eye(3,3, CV_32F)),
 	_iptMat(Mat::eye(3, 3, CV_32F)), _map(Mat::zeros(mapSize, CV_32F)), _mapMask(Mat::zeros(mapSize, CV_32F)), _mapTileSize(tileSize),
-	_colorSpace(colorSpace)
+	_colorSpace(colorSpace), _lineMode(lineMode)
 {
 	_clahe = createCLAHE();
 	_clahe->setClipLimit(2);
@@ -299,62 +300,79 @@ void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display, int horizon)
 	Mat &LPlane = planes[lPlaneId];
 	split(frame, planes);
 
+	Mat illumCorrected;
+	_clahe->apply(LPlane, illumCorrected);
+
 	// Blur
 	t1 = getTickCount();
 	Mat blurred;
-	GaussianBlur(LPlane, blurred, Size(3, 3), 5, 5, BORDER_DEFAULT);
+	GaussianBlur(illumCorrected, blurred, Size(3, 3), 5, 5, BORDER_DEFAULT);
 	t2 = getTickCount();
 	_perf.line.blur = t2 - t1;
 
-	// Background subtraction
-	t1 = t2;
-	Mat hist;
-	int histSize = 8;
-	float range[] = { 0, 256 };
-	const float *histRange = { range };
-	calcHist(&blurred, 1, NULL, Mat(), (OutputArray)hist, 1, &histSize, &histRange, true, false);
-	int loBin, hiBin;
-	float loCount, hiCount;
-	loCount = hiCount = hist.at<float>();
-	loBin = hiBin = 0;
-	float binSize = range[1] / histSize;
-	for(int i = 1; i < histSize; i++)
-	{
-		float val = hist.at<float>(i);
-		if (val < loCount) {
-			loCount = val;
-			loBin = i;
-		}
-		if (val > hiCount) {
-			hiCount = val;
-			hiBin = i;
-		}
-	}
-	
-	if (hiBin == 0) hiBin++;
-	int loVal = int(((hiBin - 1) * binSize) + 0.5f);
-	int hiVal = int(((hiBin + 1) * binSize)  + 0.5f);
-	t2 = getTickCount();
-	_perf.line.hist = t2 - t1;
-
-	// Masking
-	t1 = t2;
-	Mat mask;
-	//inRange(blurred, loVal, hiVal, mask);
-	threshold(blurred, mask, loVal, 255, THRESH_BINARY);
-	
-	dilate(mask, mask, Mat(), Point(-1, -1), 2);
-	//mask = 255 - mask;
-	t2 = getTickCount();
-	_perf.line.mask = t2 - t1;
-
-
-	// Canny
-	t1 = t2;
 	Mat edges;
-	Canny(mask, edges, 200, 250, 3, false);
-	t2 = getTickCount();
-	_perf.line.canny = t2 - t1;
+	if(_lineMode == 0)
+	{
+		// Background subtraction
+		t1 = t2;
+		Mat hist;
+		int histSize = 16;
+		float range[] = { 0, 256 };
+		const float *histRange = { range };
+		Mat bgSection = blurred(Rect(295, 75, 230, 90));
+		calcHist(&bgSection, 1, NULL, Mat(), (OutputArray)hist, 1, &histSize, &histRange, true, false);
+		int loBin, hiBin;
+		float loCount, hiCount;
+		loCount = hiCount = hist.at<float>();
+		loBin = hiBin = 0;
+		float binSize = range[1] / histSize;
+		for (int i = 1; i < histSize; i++)
+		{
+			float val = hist.at<float>(i);
+			if (val < loCount) {
+				loCount = val;
+				loBin = i;
+			}
+			if (val > hiCount) {
+				hiCount = val;
+				hiBin = i;
+			}
+		}
+
+		if (hiBin == 0) hiBin++;
+		int loVal = int(((hiBin - 1) * binSize) + 0.5f);
+		int hiVal = int(((hiBin + 1) * binSize) + 0.5f);
+		t2 = getTickCount();
+		_perf.line.hist = t2 - t1;
+
+		// Masking
+		t1 = t2;
+		Mat mask;
+		//inRange(blurred, loVal, hiVal, mask);
+		threshold(blurred, mask, loVal, 255, THRESH_BINARY);
+
+		dilate(mask, mask, Mat(), Point(-1, -1), 2);
+		//mask = 255 - mask;
+		t2 = getTickCount();
+		_perf.line.mask = t2 - t1;
+
+		// Canny
+		t1 = t2;
+		Canny(mask, edges, 200, 250, 3, false);
+		t2 = getTickCount();
+		_perf.line.canny = t2 - t1;
+	} else
+	{
+		// Canny
+		t1 = t2;
+		Canny(blurred, edges, 200, 250, 3, false);
+		t2 = getTickCount();
+		_perf.line.canny = t2 - t1;
+		edges = edges(Rect(0, 0, edges.cols, edges.rows - 80));
+	}
+
+
+
 
 	// Hough
 	t1 = t2;
