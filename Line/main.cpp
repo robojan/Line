@@ -10,7 +10,8 @@
 #include <iomanip>
 #include <iostream>
 #include <string>
-#include "control.h"
+#include "Control.h"
+#include "Communication.h"
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -74,7 +75,7 @@ void mainLoopSingleFrame(Mat frame, ImgProcessor &processor)
 	}
 }
 
-void mainLoopVideo(VideoCapture &video, ImgProcessor &processor)
+void mainLoopVideo(VideoCapture &video, ImgProcessor &processor, Control &control)
 {
 	Mat frame, display;
 	int64 lastFrameTime = getTickCount();
@@ -89,10 +90,6 @@ void mainLoopVideo(VideoCapture &video, ImgProcessor &processor)
 			freeze = !freeze;
 			break;
 		}
-		int64 now = getTickCount();
-		double tickFrequency = getTickFrequency();
-		double fps = tickFrequency / (now - lastFrameTime);
-		lastFrameTime = now;
 
 		if(!freeze)
 		{
@@ -102,6 +99,11 @@ void mainLoopVideo(VideoCapture &video, ImgProcessor &processor)
 			break;
 		}
 		processor.Process(frame, display, Point2f(10000,10000), 0);
+		int64 now = getTickCount();
+		double tickFrequency = getTickFrequency();
+		double fps = tickFrequency / (now - lastFrameTime);
+		lastFrameTime = now;
+		control.Update(float(1 / fps));
 		
 		std::ostringstream fpsStream;
 		fpsStream << "FPS: " << std::setprecision(2) << fps;
@@ -198,7 +200,8 @@ int main(int argc, char **argv)
 		fprintf(stdout, "No serial device given. use --serial dev to specify the device\n");
 	}
 
-	Communication control(options.GetControlDevice(), options.GetBaudRate());
+	Communication communication(options.GetControlDevice(), options.GetBaudRate());
+	Control control(&processor, &communication);
 
 	std::string captureDevice = options.GetCaptureDevice();
 	if (captureDevice.empty())
@@ -233,7 +236,7 @@ int main(int argc, char **argv)
 			capture.set(CV_CAP_PROP_FRAME_HEIGHT, options.GetProcessingResolution().height);
 		}
 
-		mainLoopVideo(capture, processor);
+		mainLoopVideo(capture, processor, control);
 	}
     return 0;
 }

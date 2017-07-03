@@ -36,6 +36,9 @@
     <ClCompile Include="GLAccelerator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Communication.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="Control.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -53,7 +56,10 @@
     <ClInclude Include="GLAccelerator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="control.h">
+    <ClInclude Include="Communication.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Control.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

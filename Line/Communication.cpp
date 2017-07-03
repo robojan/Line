@@ -1,4 +1,4 @@
-#include "control.h"
+#include "Communication.h"
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -30,12 +30,12 @@ bool Communication::IsConnected()
 	return false;
 }
 
-void Communication::Forward(float distance)
+void Communication::Forward(int distance, int speed)
 {
 
 }
 
-void Communication::Turn(float angle)
+void Communication::Turn(int angle, int speed)
 {
 
 }
