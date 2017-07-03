@@ -47,7 +47,7 @@ ImgProcessor::ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, 
 	_trackingFrames(0), _trackedFrames(0), _horizon(0.5f), 
 	_cameraCorrectionMat(Mat::eye(3, 3, CV_32F)), _cameraCorrectionDist(Mat::zeros(5, 1, CV_32F)),
 	_cameraCorrectionTSR(Mat::eye(3,3, CV_32F)),
-	_iptMat(Mat::eye(3, 3, CV_32F)), _map(Mat::zeros(mapSize, CV_32F)), _mapTileSize(tileSize)
+	_iptMat(Mat::eye(3, 3, CV_32F)), _map(Mat::zeros(mapSize, CV_32F)), _mapMask(Mat::zeros(mapSize, CV_32F)), _mapTileSize(tileSize)
 {
 	_clahe = createCLAHE();
 	_clahe->setClipLimit(2);
@@ -57,17 +57,7 @@ ImgProcessor::ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, 
 	SetSignAreaLimit(1000, 10000);
 	ResetSignCounter();
 	CalculateCameraCorrection();
-
-	std::vector<Point2f> imPoints;
-	std::vector<Point2f> rePoints;
-	imPoints.push_back(Point2f(52, 126-112)); rePoints.push_back(Point2f(-1000, 1500));
-	imPoints.push_back(Point2f(100, 144-112)); rePoints.push_back(Point2f(-500, 1000));
-	imPoints.push_back(Point2f(379, 175-112)); rePoints.push_back(Point2f(500, 500));
-	imPoints.push_back(Point2f(274, 135-112)); rePoints.push_back(Point2f(500, 1500));
-	imPoints.push_back(Point2f(305, 148-112)); rePoints.push_back(Point2f(500, 1000));
-
-	Mat ipt = cv::findHomography(imPoints, rePoints);
-	std::cout << ipt;
+	CreateMapMask();
 
 	if(accelerated)
 	{
@@ -167,7 +157,7 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display, cv::Point2f pos, fl
 	_perf.pre.split = t2 - t1;
 
 	// Process the rest
-	ProcessLines(streetImg, streetDisplay, pos, angle);
+	ProcessLines(streetImg, streetDisplay, horizon);
 	if(_trackingFrames == _trackedFrames)
 	{
 		_detectedSigns.clear();
@@ -200,6 +190,7 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display, cv::Point2f pos, fl
 void ImgProcessor::SetHorizon(float horizon)
 {
 	_horizon = horizon;
+	CreateMapMask();
 }
 
 void ImgProcessor::SetSkyLimit(float skyLimit)
@@ -256,6 +247,7 @@ void ImgProcessor::SetCameraCorrection(const cv::Mat& matrix, const cv::Mat& dis
 void ImgProcessor::SetIPT(const cv::Mat& matrix)
 {
 	_iptMat = matrix;
+	CreateMapMask();
 }
 
 void ImgProcessor::ScaleFrame(cv::Mat& in, cv::Mat &out)
@@ -271,7 +263,7 @@ void ImgProcessor::ScaleFrame(cv::Mat& in, cv::Mat &out)
 	resize(in, out, _resolution, 0, 0, INTER_LINEAR);
 }
 
-void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display, cv::Point2f pos, float angle)
+void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display, int horizon)
 {
 	int64 t1, t2;
 	
@@ -341,50 +333,8 @@ void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display, cv::Point2f po
 	t1 = t2;
 	std::vector<Vec4i> lines;
 	HoughLinesP(edges, lines, 1.5, CV_PI / 180, 30, 50, 35);
-	//std::vector<Vec2f> lines;
-	//HoughLines(edges, lines, 1.5, CV_PI / 180, 50, 0, 0, 0, CV_PI);
 	t2 = getTickCount();
 	_perf.line.hough = t2 - t1;
-
-	/*
-	std::vector<Vec2f> linesParameters(lines.size());
-	float avgRho = 0, avgTheta = 0;
-	int leftLine=-1, rightLine=-1;
-	float leftDist = INFINITY; float rightDist = INFINITY;
-	Point center(frame.cols / 2, frame.rows / 2);
-	for(int i = 0; i < lines.size(); i++)
-	{
-		Vec4i &line = lines[i];
-		Point pt1(line[0], line[1]);
-		Point pt2(line[2], line[3]);
-		float dx = line[2] - line[0];
-		float dy = line[3] - line[1];
-		float rho = abs(pt2.x*pt1.y - pt2.y*pt1.x) / norm(pt2 - pt1);
-		float theta = -atan2(dx, dy);
-		avgRho += rho;
-		avgTheta += theta;
-		float dist = abs(dy*center.x - dx*center.y + pt2.x*pt1.y - pt2.y * pt1.x) /
-			sqrtf(dy*dy + dx*dx);
-		if(pt1.x < center.x && pt2.x < center.x && dist < leftDist)
-		{
-			leftLine = i;
-		}
-		if (pt1.x > center.x && pt2.x > center.x && dist < rightDist)
-		{
-			rightLine = i;
-		}
-		
-		float a = cosf(theta);
-		float b = sinf(theta);
-		double x0 = a * rho;
-		double y0 = b * rho;
-		Point dpA(cvRound(x0 + 1000 * (-b)), cvRound(y0 + 1000 * a));
-		Point dpB(cvRound(x0 - 1000 * (-b)), cvRound(y0 - 1000 * a));
-		cv::line(display, dpA, dpB, Scalar(255, 255, 0), 1, LINE_8, 0);
-		linesParameters[i] = Vec2f(rho, theta);
-	}
-	avgRho /= lines.size();
-	avgTheta /= lines.size();*/
 
 	// Draw the lines
 	t1 = t2;
@@ -394,40 +344,11 @@ void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display, cv::Point2f po
 		{
 			Vec4i &detectedLine = lines[i];
 			Scalar color = Scalar(255, 0, 0);
-			/*if(leftLine == i || rightLine == i)
-			{
-				color = Scalar(0, 255, 0);
-			} else
-			{
-				color = Scalar(255, 0, 0);
-			}*/
 			line(display, Point(detectedLine[0], detectedLine[1]), Point(detectedLine[2], detectedLine[3]), color, 2, LINE_8, 0);
-			/*float theta = lines[i][1];
-			float rho = lines[i][0];
-			float a = cosf(theta);
-			float b = sinf(theta);
-			double x0 = a * rho;
-			double y0 = b * rho;
-			Point avgLineA(cvRound(x0 + 1000 * (-b)), cvRound(y0 + 1000 * a));
-			Point avgLineB(cvRound(x0 - 1000 * (-b)), cvRound(y0 - 1000 * a));
-			line(display, avgLineA, avgLineB, Scalar(255, 255, 0), 3, LINE_8, 0);*/
 		}
-		/*
-		float a = cosf(avgTheta);
-		float b = sinf(avgTheta);
-		double x0 = a * avgRho;
-		double y0 = b * avgRho;
-		Point avgLineA(cvRound(x0 + 1000 * (-b)), cvRound(y0 + 1000 * a));
-		Point avgLineB(cvRound(x0 - 1000 * (-b)), cvRound(y0 - 1000 * a));
-		line(display, avgLineA, avgLineB, Scalar(255, 255, 0), 3, LINE_8, 0);*/
 	}
 	t2 = getTickCount();
 	_perf.line.drawing = t2 - t1;
-
-	//Mat topdown;
-	//Mat scale = (Mat_<float>(3, 3) << 0.1, 0, 250, 0, -0.1, 1000, 0, 0, 1);
-	Mat robotMat = (Mat_<float>(3, 3) << cos(angle), -sin(angle), pos.x, sin(angle), cos(angle), pos.y, 0, 0, 1);
-	Mat ipt = robotMat * _iptMat;
 	
 	//warpPerspective(display, topdown, ipt, Size(700, 1000));
 	std::vector<Vec4f> tdLines;
@@ -436,26 +357,27 @@ void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display, cv::Point2f po
 		Vec4i &detectedLine = lines[i];
 		std::vector<Point2f> src(2);
 		std::vector<Point2f> dst(2);
-		src[0] = Point2f((float)detectedLine[0], (float)detectedLine[1]);
-		src[1] = Point2f((float)detectedLine[2], (float)detectedLine[3]);
-		perspectiveTransform(src, dst, ipt);
+		src[0] = Point2f((float)detectedLine[0], (float)detectedLine[1] + horizon);
+		src[1] = Point2f((float)detectedLine[2], (float)detectedLine[3] + horizon);
+		perspectiveTransform(src, dst, _iptMat);
 		Scalar color = Scalar(0, 0, 255);
-		if (dst[0].x < -20000 || dst[0].x > 20000 || dst[0].y < -20000 || dst[0].y > 20000 ||
-			dst[1].x < -20000 || dst[1].x > 20000 || dst[1].y < -20000 || dst[1].y > 20000)
+		if (dst[0].x < -100 || dst[0].x > 100 || dst[0].y < 0 || dst[0].y > 300 ||
+			dst[1].x < -100 || dst[1].x > 100 || dst[1].y < 0 || dst[1].y > 300 ||
+			(dst[0].x > -10 && dst[0].x < 17 && dst[0].y < 17) || 
+			(dst[0].x > -10 && dst[0].x < 17 && dst[0].y < 17))
 		{
 			continue;
 		}
 		tdLines.push_back(Vec4f(dst[0].x, dst[0].y, dst[1].x, dst[1].y));
-		//line(topdown, dst[0], dst[1], color, 2, LINE_8, 0);
 	}
 	std::vector<cv::Point2f> visibleRect(4);
-	visibleRect[0] = Point2f(0, 0);
-	visibleRect[1] = Point2f(float(frame.cols - 1), 0);
-	visibleRect[2] = Point2f(float(frame.cols - 1), float(frame.rows - 1));
-	visibleRect[3] = Point2f(0, float(frame.rows - 1));
-	perspectiveTransform(visibleRect, visibleRect, ipt);
+	visibleRect[0] = Point2f(0, 0 + horizon);
+	visibleRect[1] = Point2f(float(frame.cols - 1), 0 + horizon);
+	visibleRect[2] = Point2f(float(frame.cols - 1), float(frame.rows - 1) + horizon);
+	visibleRect[3] = Point2f(0, float(frame.rows - 1) + horizon);
+	perspectiveTransform(visibleRect, visibleRect, _iptMat);
 
-	UpdateMap(tdLines, visibleRect, pos, angle);
+	UpdateMap(tdLines, visibleRect);
 
 }
 
@@ -680,16 +602,17 @@ void ImgProcessor::UpdateSignCounter()
 	}
 }
 
-void ImgProcessor::UpdateMap(const std::vector<cv::Vec4f>& lines, const std::vector<cv::Point2f>& visible, const Point2f &pos, float angle)
+void ImgProcessor::UpdateMap(const std::vector<cv::Vec4f>& lines, const std::vector<cv::Point2f>& visible)
 {
-	Mat newMap = Mat::zeros(_map.cols, _map.rows, CV_32F);
+	Mat newMap = _mapMask.clone();
+	Point2f offset(_map.cols / 2, 0);
 	for(Vec4f line : lines)
 	{
 		Point2f a(line[0], line[1]); 
 		Point2f b(line[2], line[3]);
 		a /= _mapTileSize;
 		b /= _mapTileSize;
-		cv::line(newMap, a, b, Scalar(1.0f));
+		cv::line(newMap, a + offset, b + offset, Scalar(1.0f));
 	}
 	addWeighted(_map, 0.8, newMap, 0.2, 0, _map);
 	if(_displayEnabled)
@@ -698,12 +621,11 @@ void ImgProcessor::UpdateMap(const std::vector<cv::Vec4f>& lines, const std::vec
 		Mat display;
 		cvtColor(_map, display, CV_GRAY2BGR);
 		Scalar visibleColor(0, 0, 255);
-		line(display, visible[0] / _mapTileSize, visible[1] / _mapTileSize, visibleColor);
-		line(display, visible[1] / _mapTileSize, visible[2] / _mapTileSize, visibleColor);
-		line(display, visible[2] / _mapTileSize, visible[3] / _mapTileSize, visibleColor);
-		line(display, visible[3] / _mapTileSize, visible[0] / _mapTileSize, visibleColor);
-		display.at<Vec3f>(pos.x / _mapTileSize, pos.y / _mapTileSize) = Vec3f(1, 0, 0);
-		resize(display, display, Size(_map.cols, _map.rows)*3, 0, 0, INTER_NEAREST);
+		/*line(display, visible[0] / _mapTileSize + offset, visible[1] / _mapTileSize + offset, visibleColor);
+		line(display, visible[1] / _mapTileSize + offset, visible[2] / _mapTileSize + offset, visibleColor);
+		line(display, visible[2] / _mapTileSize + offset, visible[3] / _mapTileSize + offset, visibleColor);
+		line(display, visible[3] / _mapTileSize + offset, visible[0] / _mapTileSize + offset, visibleColor);*/
+		resize(display, display, Size(_map.cols, _map.rows)*6, 0, 0, INTER_NEAREST);
 		Mat flipped;
 		flip(display, flipped, 0);
 
@@ -722,6 +644,29 @@ void ImgProcessor::CalculateCameraCorrection()
 	// create undistortion maps
 	initUndistortRectifyMap(_cameraCorrectionMat, _cameraCorrectionDist, Mat(),
 		newCameraMatrix, _resolution, CV_16SC2, _cameraMap1, _cameraMap2);
+}
+
+void ImgProcessor::CreateMapMask()
+{
+	_mapMask = Mat::ones(_map.rows, _map.cols, CV_32F);
+	Point2f offset(_map.cols / 2, 0);
+
+	int horizon = int(_horizon * _resolution.height);
+	std::vector<cv::Point2f> visiblePoly(4);
+	visiblePoly[0] = Point2f(0, 0 + horizon);
+	visiblePoly[1] = Point2f(float(_resolution.width - 1), 0 + horizon);
+	visiblePoly[2] = Point2f(float(_resolution.width - 1), float(_resolution.height - 1));
+	visiblePoly[3] = Point2f(0, float(_resolution.height - 1));
+	perspectiveTransform(visiblePoly, visiblePoly, _iptMat);
+	std::vector<cv::Point> poly;
+	for (auto p : visiblePoly)
+	{
+		Point ip(p / _mapTileSize + offset);
+		//ip.y = _map.rows - ip.y;
+		poly.push_back(ip);
+	}
+	fillConvexPoly(_mapMask, poly, Scalar(0));
+	_mapMask.at<float>(Point(_map.cols / 2, 0)) = 0;
 }
 
 void ImgProcessor::ResetSignCounter()

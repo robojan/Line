@@ -57,7 +57,7 @@ void mainLoopSingleFrame(Mat frame, ImgProcessor &processor)
 		double fps = tickFrequency / (now - lastFrameTime);
 		lastFrameTime = now;
 
-		processor.Process(frame, display, Point2f(10000,10000), 0);
+		processor.Process(frame, display, Point2f(1000,1000), 0);
 
 		std::ostringstream fpsStream;
 		fpsStream << "FPS: " << std::setprecision(2) << fps;
@@ -98,7 +98,7 @@ void mainLoopVideo(VideoCapture &video, ImgProcessor &processor, Control &contro
 		if (frame.empty()) {
 			break;
 		}
-		processor.Process(frame, display, Point2f(10000,10000), 0);
+		processor.Process(frame, display, Point2f(1000,1000), 0);
 		int64 now = getTickCount();
 		double tickFrequency = getTickFrequency();
 		double fps = tickFrequency / (now - lastFrameTime);

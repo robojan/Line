@@ -8,7 +8,7 @@ OptionsManager::OptionsManager(int argc, char** argv) :
 	_debug(false), _name(argv[0]), _resolution(640, 480), _tracking(false), _horizon(0.5f),
 	_acceleration(false), _cameraCorrMat(cv::Mat::eye(3, 3, CV_32F)),
 	_cameraCorrDist(cv::Mat::zeros(5, 1, CV_32F)), _iptMat(cv::Mat::eye(3, 3, CV_32F)),
-	_baudRate(115200), _mapSize(200, 200), _mapTileSize(100), _cameraCorrTSR(cv::Mat::eye(3, 3, CV_32F)),
+	_baudRate(115200), _mapSize(200, 200), _mapTileSize(10), _cameraCorrTSR(cv::Mat::eye(3, 3, CV_32F)),
 	_skylimit(0), _signAreaLimit(100, 5000), _signRatioLimit(0.75f, 1.5f), _detectorType(0)
 {
 	_thresholds[FeatureType::BlueSign] = ColorThreshold(cv::Scalar(0, 130, 92), cv::Scalar(255, 140, 105));
