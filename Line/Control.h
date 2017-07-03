@@ -1,13 +1,22 @@
 #ifndef _CONTROL_H_H
 #define _CONTROL_H_H
 
+#include <string>
+
 class ImgProcessor;
 class Communication;
 
 class Control
 {
 	enum class State {
-		Init
+		Init,
+		Uturn,
+		Stop,
+		Left,
+		Right,
+		Forward
+
+
 	};
 
 public:
@@ -15,11 +24,13 @@ public:
 	~Control();
 
 	void Update(float deltaTime);
+	void Control::correctPos();
 
 private:
 	ImgProcessor *_img;
 	Communication *_comm;
-
+	std::string _old;
+	int _filter;
 	State _state;
 };
 

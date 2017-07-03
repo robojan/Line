@@ -54,6 +54,7 @@ public:
 
 	void ResetSignCounter();
 	void GetSignProbabilities(std::map<std::string, float> &out);
+	void GetMostProbableSign(std::string &name, float &prob);
 private:
 	struct Performance {
 		struct {

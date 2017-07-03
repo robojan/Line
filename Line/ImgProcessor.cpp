@@ -673,6 +673,8 @@ void ImgProcessor::UpdateSignCounter()
 	{
 		// TODO include size of the sign
 		float val = detected.area/100.0f;
+		float dist = (_resolution.width/2)-(detected.roi.x + detected.roi.width / 2);
+		val = val*(_resolution.width / 2 - abs(dist)) / (_resolution.width / 2);
 		_signsDetectedCounter[detected.sign] += val;
 		_totalDetectedCounter += val;
 	}
@@ -733,6 +735,23 @@ void ImgProcessor::GetSignProbabilities(std::map<std::string, float>& out)
 	for (auto signs : _signsDetectedCounter) {
 		out[signs.first] = signs.second / _totalDetectedCounter;
 	}
+}
+
+void ImgProcessor::GetMostProbableSign(std::string &name, float &prob) {
+	std::map<std::string, float> detected;
+	float max = 0;
+	std::string temp="none";
+	GetSignProbabilities(detected);
+	for (auto detected : detected) {
+		if (detected.second > max) {
+			max = detected.second;
+			temp = detected.first;
+		}
+	}
+	prob = max;
+	name = temp;
+
+
 }
 
 float getTimeMs(int64 time)
