@@ -84,19 +84,26 @@ bool Communication::IsConnected()
 	return _fd >= 0;
 }
 
-void Communication::Forward(float distance)
+void Communication::Forward(int distance, int speed)
 {
-
+	std::string msg = "$DRIVE," + std::to_string(distance) + "," + std::to_string(speed) + "\n";
+	SendMessage(msg);
 }
 
-void Communication::Turn(float angle)
+void Communication::Turn(int angle, int speed)
 {
-
+	std::string msg = "$TURN," + std::to_string(angle) + "," + std::to_string(speed) + "\n";
+	SendMessage(msg);
 }
 
 void Communication::Sweep(bool on)
 {
-
+	if (on) {
+		SendMessage("$SWEEP,1\n");
+	}
+	else {
+		SendMessage("$SWEEP,0\n");
+	}
 }
 
 float Communication::GetEnergyIn()
@@ -173,6 +180,10 @@ void Communication::ProcessMessage(const char *str)
 		if (type == "ENERGY")
 		{
 			
+		}
+		else if (type == "POS")
+		{
+
 		}
 		else {
 			fprintf(stderr, "Unknown msg received: %s\n", type.c_str());

@@ -34,8 +34,8 @@ public:
 
 	bool IsConnected();
 
-	void Forward(float distance);
-	void Turn(float angle);
+	void Forward(int distance, int speed);
+	void Turn(int angle, int speed);
 
 	void Sweep(bool on);
 
