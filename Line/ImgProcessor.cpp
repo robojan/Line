@@ -549,36 +549,58 @@ void ImgProcessor::ProcessSignContour(cv::Mat& frame, cv::Mat& display,
 	cv::Scalar color = _features->GetOverlayColor(type);
 	int64 t1, t2;
 
-	for (unsigned int i = 0; i < contours.size(); i++)
+	std::vector<Rect> boundingRects;
+	for(auto contour : contours)
 	{
-		float area = (float)contourArea(contours[i]);
+		Rect testRect = boundingRect(contour);
+		int testLeft = testRect.tl().x;
+		int testRight = testRect.br().x;
+		int testTop = testRect.tl().y;
+		int testBottom = testRect.br().y;
+		bool found = false;
+		for(auto rect : boundingRects)
+		{
+			int left = rect.tl().x;
+			int right = rect.br().x;
+			int top = rect.tl().y;
+			int bottom = rect.br().y;
+			if(testLeft < right && testRight > left && 
+				testTop > bottom && testBottom < top)
+			{
+				rect.x = min(left, testLeft);
+				rect.y = min(testTop, top);
+				rect.width = max(right - rect.x, testRight - rect.x);
+				rect.height = max(bottom - rect.y, testBottom - rect.y);
+				found = true;
+				break;
+			}
+		}
+		if(!found)
+		{
+			boundingRects.push_back(testRect);
+		}
+	}
+
+	for (unsigned int i = 0; i < boundingRects.size(); i++)
+	{
+		Rect &rect = boundingRects[i];
+		float area = rect.width * rect.height;
 		if (area < minArea || area > maxArea)
 			continue;
-		Rect rect = boundingRect(contours[i]);
 		float ratio = float(rect.width) / float(rect.height);
 		if (ratio < minRatio || ratio > maxRatio)
 			continue;
 
 		Mat signImage = frame(rect);
 		
-		t1 = getTickCount();
 
 		// illumination correction
-		Mat illumCorrectedPlanes[3];
-		Mat &illumCorrectedDebuggerView = illumCorrectedPlanes[0];
-		split(signImage, illumCorrectedPlanes);
-		_clahe->apply(illumCorrectedPlanes[0], illumCorrectedPlanes[0]);
-		t2 = getTickCount();
-		_perf.sign.detectPart.illumCorrection = (_perf.sign.detectPart.illumCorrection * 3 + (t2 - t1)) / 4;
+		Mat labPlanes[3];
+		Mat &lplane = labPlanes[0];
+		split(signImage, labPlanes);
 
-		t1 = t2;
-		Mat signEdges;
-		cv::Canny(illumCorrectedPlanes[0], signEdges, 150, 200, 3);
-		t2 = getTickCount();
-		_perf.sign.detectPart.canny = (_perf.sign.detectPart.canny * 3 + (t2 - t1)) / 4;
-
-		t1 = t2;
-		std::string matchStr = _features->FindMatch(type, signEdges);
+		t1 = getTickCount();
+		std::string matchStr = _features->FindMatch(type, lplane);
 		t2 = getTickCount();
 		_perf.sign.detectPart.match = (_perf.sign.detectPart.match * 3 + (t2 - t1)) / 4;
 
@@ -592,7 +614,7 @@ void ImgProcessor::ProcessSignContour(cv::Mat& frame, cv::Mat& display,
 			detected.push_back(result);
 			if(_displayEnabled)
 			{
-				putText(display, matchStr, Point(rect.x, rect.y), FONT_HERSHEY_COMPLEX, 0.75, color, 1);
+				putText(display, matchStr + "(" + std::to_string(area) + ")", Point(rect.x, rect.y), FONT_HERSHEY_COMPLEX, 0.75, color, 1);
 			}
 		}
 		if(_displayEnabled)
@@ -643,10 +665,14 @@ void ImgProcessor::ProcessTracking(cv::Mat& frame, std::vector<track_data_t>& de
 
 void ImgProcessor::UpdateSignCounter()
 {
+	for(auto signValue : _signsDetectedCounter)
+	{
+		_signsDetectedCounter[signValue.first] = signValue.second * 0.99f;
+	}
 	for (auto detected : _detectedSigns)
 	{
 		// TODO include size of the sign
-		float val = 1;
+		float val = detected.area/100.0f;
 		_signsDetectedCounter[detected.sign] += val;
 		_totalDetectedCounter += val;
 	}

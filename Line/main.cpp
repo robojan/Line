@@ -147,14 +147,28 @@ int main(int argc, char **argv)
 	}
 
 	printf("Loading feature library\n");
-	FeatureLibrary library(400);
+	FeatureLibrary::DetectorType detectorType = (FeatureLibrary::DetectorType)options.GetDetectorType();
+	FeatureLibrary library(detectorType, 300);
 	try
 	{
-		library.Add(FeatureType::BlueSign, "Left", "signs/left_64.jpg");
-		library.Add(FeatureType::BlueSign, "Right", "signs/right_64.jpg");
-		library.Add(FeatureType::BlueSign, "Forward", "signs/straight_64.jpg");
-		library.Add(FeatureType::RedSign, "Stop", "signs/stop_64.jpg");
-		library.Add(FeatureType::YellowSign, "UTurn", "signs/uturn_64.jpg");
+		switch(detectorType)
+		{
+		case FeatureLibrary::DetectorType::SURFIllumCanny:
+		case FeatureLibrary::DetectorType::SURF:
+			library.Add(FeatureType::BlueSign, "Left", "signs/left_64.jpg");
+			library.Add(FeatureType::BlueSign, "Right", "signs/right_64.jpg");
+			library.Add(FeatureType::BlueSign, "Forward", "signs/straight_64.jpg");
+			library.Add(FeatureType::RedSign, "Stop", "signs/stop_64.jpg");
+			library.Add(FeatureType::YellowSign, "UTurn", "signs/uturn_64.jpg");
+			break;
+		case FeatureLibrary::DetectorType::Cascacade:
+			library.AddCascade(FeatureType::BlueSign, "Left", "cascade/left/cascade.xml");
+			library.AddCascade(FeatureType::BlueSign, "Forward", "cascade/forward/cascade.xml");
+			library.AddCascade(FeatureType::BlueSign, "Right", "cascade/right/cascade.xml");
+			library.AddCascade(FeatureType::RedSign, "Stop", "cascade/stop/cascade.xml");
+			library.AddCascade(FeatureType::YellowSign, "UTurn", "cascade/uturn/cascade.xml");
+			break;
+		}
 		library.SetTypeOverlayColor(FeatureType::BlueSign, Scalar(255, 0, 0));
 		library.SetTypeOverlayColor(FeatureType::RedSign, Scalar(0, 0, 255));
 		library.SetTypeOverlayColor(FeatureType::YellowSign, Scalar(0, 255, 255));

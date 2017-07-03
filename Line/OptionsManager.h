@@ -45,6 +45,7 @@ public:
 	const ColorThreshold &GetColorThreshold(FeatureType type) const;
 	const cv::Vec2f &GetSignAreaLimit() const;
 	const cv::Vec2f &GetSignRatioLimit() const;
+	const int GetDetectorType() const;
 
 
 
@@ -71,4 +72,5 @@ private:
 	cv::Vec2f _signAreaLimit;
 	cv::Vec2f _signRatioLimit;
 	std::map<FeatureType, ColorThreshold> _thresholds;
+	int _detectorType;
 };

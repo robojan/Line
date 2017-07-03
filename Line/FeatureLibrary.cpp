@@ -3,12 +3,21 @@
 #include <exception>
 #include <opencv2/imgproc.hpp>
 
-FeatureLibrary::FeatureLibrary(int minHessian /* = 400 */)
+FeatureLibrary::FeatureLibrary(DetectorType type, int minHessian /* = 400 */) :
+	_type(type)
 {
-	_detector = cv::xfeatures2d::SURF::create(minHessian);
-	_matcher = cv::BFMatcher::create(cv::NORM_L2, true);
-	_clahe = cv::createCLAHE();
-	_clahe->setClipLimit(2);
+	switch(type)
+	{
+	case DetectorType::SURFIllumCanny:
+		_clahe = cv::createCLAHE();
+		_clahe->setClipLimit(2);
+	case DetectorType::SURF:
+		_matcher = cv::BFMatcher::create(cv::NORM_L2, true);
+		_detector = cv::xfeatures2d::SURF::create(minHessian);
+	case DetectorType::Cascacade:
+
+		break;
+	}
 }
 
 FeatureLibrary::~FeatureLibrary()
@@ -33,14 +42,39 @@ void FeatureLibrary::Add(FeatureType type, const std::string &name, cv::Mat imag
 {
 	struct featureInfo info;
 
-	// illumination correction
 	cv::Mat illumCorrected;
-	_clahe->apply(image, illumCorrected);
+	switch(_type)
+	{
+	case DetectorType::SURFIllumCanny:
+		_clahe->apply(image, illumCorrected);
+		cv::Canny(illumCorrected, illumCorrected, 150, 200, 3);
+		_detector->detectAndCompute(illumCorrected, cv::Mat(), info.keypoints, info.descriptor);
+		info.image = illumCorrected;
+		break;
+	case DetectorType::SURF:
+		_detector->detectAndCompute(image, cv::Mat(), info.keypoints, info.descriptor);
+		info.image = image;
+		break;
+	default:
+		throw std::runtime_error("Error cannot add image");
+	}
 
-	cv::Canny(illumCorrected, illumCorrected, 150, 200, 3);
+	_featuremap[type].objects[name] = info;
+}
 
-	_detector->detectAndCompute(illumCorrected, cv::Mat(), info.keypoints, info.descriptor);
-	info.image = illumCorrected;
+void FeatureLibrary::AddCascade(FeatureType type, const std::string& name, const std::string& path)
+{
+	struct featureInfo info;
+	if(_type != DetectorType::Cascacade)
+	{
+		throw std::runtime_error("Error invalid detector type");
+	}
+
+	if(!info.classifier.load(path))
+	{
+		throw std::runtime_error("Error loading cascade data");
+	}
+
 	_featuremap[type].objects[name] = info;
 }
 
@@ -64,11 +98,28 @@ const cv::Mat& FeatureLibrary::GetDescriptors(FeatureType type, const std::strin
 	return _featuremap.at(type).objects.at(name).descriptor;
 }
 
-std::string FeatureLibrary::FindMatch(cv::InputArray image, double *avgDist, double *minDist, double *maxDist)
+void FeatureLibrary::PreProcess(cv::Mat &image, cv::Mat& mat)
+{
+	switch(_type)
+	{
+	case DetectorType::SURFIllumCanny:
+		PreProcessIllumCanny(image, mat);
+		break;
+	case DetectorType::Cascacade: 
+		PreProcessCascade(image, mat);
+		break;
+	default: 
+		mat = image;
+		break;
+	}
+}
+
+std::string FeatureLibrary::FindMatch(cv::Mat & image, double *avgDist, double *minDist, double *maxDist)
 {
 	double bestAvgDist = INFINITY;
 	double bestMinDist = INFINITY;
 	double bestMaxDist = 0;
+
 	std::string bestMatch;
 	for(auto type : _featuremap)
 	{
@@ -91,16 +142,18 @@ std::string FeatureLibrary::FindMatch(cv::InputArray image, double *avgDist, dou
 	return bestMatch;
 }
 
-std::string FeatureLibrary::FindMatch(FeatureType type, cv::InputArray image, double *avgDist, double *minDist, double *maxDist)
+std::string FeatureLibrary::FindMatch(FeatureType type, cv::Mat & image, double *avgDist, double *minDist, double *maxDist)
 {
 	double bestAvgDist = INFINITY;
 	double bestMinDist = INFINITY;
 	double bestMaxDist = 0;
 	std::string bestMatch;
+	cv::Mat preprocessedImage;
+	PreProcess(image, preprocessedImage);
 	for (auto object : _featuremap.at(type).objects)
 	{
 		double curAvgDist, curMinDist, curMaxDist;
-		if(FindMatch(type, object.first, image, &curAvgDist, &curMinDist, &curMaxDist))
+		if(FindMatch(type, object.first, preprocessedImage, &curAvgDist, &curMinDist, &curMaxDist))
 		{
 			if(curAvgDist < bestAvgDist)
 			{
@@ -117,12 +170,25 @@ std::string FeatureLibrary::FindMatch(FeatureType type, cv::InputArray image, do
 	return bestMatch;
 }
 
-bool FeatureLibrary::FindMatch(FeatureType type, const std::string name, cv::InputArray image, double *avgDist, double *minDist, double *maxDist)
+bool FeatureLibrary::FindMatch(FeatureType type, const std::string name, cv::Mat & image, double *avgDist, double *minDist, double *maxDist)
+{
+	switch(_type)
+	{
+	case DetectorType::SURFIllumCanny:
+	case DetectorType::SURF:
+		return FindMatchSURFIllumCanny(type, name, image, avgDist, minDist, maxDist);
+	case DetectorType::Cascacade:
+		return FindMatchCascade(type, name, image, avgDist, minDist, maxDist);
+	default:
+		throw std::runtime_error("Invallid detector type");
+	}
+}
+
+bool FeatureLibrary::FindMatchSURFIllumCanny(FeatureType type, const std::string name, cv::Mat & image, double* avgDist, double* minDist, double* maxDist)
 {
 	std::vector<cv::DMatch> matches;
-	struct featureInfo objectInfo = _featuremap.at(type).objects.at(name);
+	struct featureInfo &objectInfo = _featuremap.at(type).objects.at(name);
 
-	cv::Mat &debugImage = (cv::Mat &)image;
 	struct featureInfo sceneInfo;
 	_detector->detectAndCompute(image, cv::Mat(), sceneInfo.keypoints, sceneInfo.descriptor);
 
@@ -133,10 +199,10 @@ bool FeatureLibrary::FindMatch(FeatureType type, const std::string name, cv::Inp
 	_matcher->match(objectInfo.descriptor, sceneInfo.descriptor, matches);
 
 	// Find max and min distances
-	double max_dist = 0; 
+	double max_dist = 0;
 	double min_dist = INFINITY;
 	double avg_dist = 0;
-	for(unsigned int i = 0; i < matches.size(); i++)
+	for (unsigned int i = 0; i < matches.size(); i++)
 	{
 		double dist = matches[i].distance;
 		avg_dist += dist;
@@ -147,9 +213,9 @@ bool FeatureLibrary::FindMatch(FeatureType type, const std::string name, cv::Inp
 
 	// Find good matches
 	std::vector<cv::DMatch> goodMatches;
-	for(unsigned int i = 0; i < matches.size(); i++)
+	for (unsigned int i = 0; i < matches.size(); i++)
 	{
-		if(matches[i].distance <= 4 * min_dist)
+		if (matches[i].distance <= 4 * min_dist)
 		{
 			goodMatches.push_back(matches[i]);
 		}
@@ -161,5 +227,28 @@ bool FeatureLibrary::FindMatch(FeatureType type, const std::string name, cv::Inp
 	if (minDist) *minDist = min_dist;
 	if (maxDist) *maxDist = max_dist;
 	if (avgDist) *avgDist = avg_dist;
-	return avg_dist <= 0.4;
+	return avg_dist <= 0.45;
+}
+
+bool FeatureLibrary::FindMatchCascade(FeatureType type, const std::string name, cv::Mat & image, double* avgDist, double* minDist, double* maxDist)
+{
+	struct featureInfo &objectInfo = _featuremap.at(type).objects.at(name);
+	std::vector<cv::Rect> matches;
+	cv::Size minSize(10,10);
+	cv::Size maxSize(100,100);
+
+	objectInfo.classifier.detectMultiScale(image, matches, 1.05, 0, 0, minSize, maxSize);
+
+	return matches.size() > 0;
+}
+
+void FeatureLibrary::PreProcessIllumCanny(cv::Mat & in, cv::Mat& out)
+{
+	_clahe->apply(in, out);
+	cv::Canny(out, out, 150, 200, 3);
+}
+
+void FeatureLibrary::PreProcessCascade(cv::Mat & in, cv::Mat& out)
+{
+	out = in;
 }

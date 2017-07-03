@@ -9,7 +9,7 @@ OptionsManager::OptionsManager(int argc, char** argv) :
 	_acceleration(false), _cameraCorrMat(cv::Mat::eye(3, 3, CV_32F)),
 	_cameraCorrDist(cv::Mat::zeros(5, 1, CV_32F)), _iptMat(cv::Mat::eye(3, 3, CV_32F)),
 	_baudRate(115200), _mapSize(200, 200), _mapTileSize(100), _cameraCorrTSR(cv::Mat::eye(3, 3, CV_32F)),
-	_skylimit(0), _signAreaLimit(100, 5000), _signRatioLimit(0.75f, 1.5f)
+	_skylimit(0), _signAreaLimit(100, 5000), _signRatioLimit(0.75f, 1.5f), _detectorType(0)
 {
 	_thresholds[FeatureType::BlueSign] = ColorThreshold(cv::Scalar(0, 130, 92), cv::Scalar(255, 140, 105));
 	_thresholds[FeatureType::RedSign] = ColorThreshold(cv::Scalar(0, 170, 138), cv::Scalar(255, 180, 155));
@@ -135,7 +135,7 @@ void OptionsManager::ReadConfigFile(const char* path)
 	_thresholds[FeatureType::RedSign] = ColorThreshold(low, high);
 	cv::read(fs["SignRatioLimit"], _signRatioLimit, _signRatioLimit);
 	cv::read(fs["SignAreaLimit"], _signAreaLimit, _signAreaLimit);
-	//cv::read(fs["Thresholds"], _thresholds, _thresholds);
+	cv::read(fs["DetectorType"], _detectorType, _detectorType);
 }
 
 void OptionsManager::WriteConfigFile(const char* path)
@@ -180,6 +180,7 @@ void OptionsManager::WriteConfigFile(const char* path)
 	}
 	fs << "SignAreaLimit" << _signAreaLimit;
 	fs << "SignRatioLimit" << _signRatioLimit;
+	fs << "DetectorType" << _detectorType;
 }
 
 bool OptionsManager::IsDebugMode() const
@@ -290,4 +291,9 @@ const cv::Vec2f& OptionsManager::GetSignAreaLimit() const
 const cv::Vec2f& OptionsManager::GetSignRatioLimit() const
 {
 	return _signRatioLimit;
+}
+
+const int OptionsManager::GetDetectorType() const
+{
+	return _detectorType;
 }
