@@ -17,6 +17,7 @@ public:
 
 	cv::Scalar Low() const;
 	cv::Scalar High() const;
+	bool isHueWraped() const;
 private:
 	cv::Scalar _low;
 	cv::Scalar _high;
@@ -34,7 +35,7 @@ class ImgProcessor
 {
 public:
 
-	ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, bool accelerated, cv::Size mapSize, float tileSize);
+	ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, bool accelerated, cv::Size mapSize, float tileSize, int colorSpace);
 	~ImgProcessor();
 
 	void Process(cv::Mat &frame, cv::Mat &display, cv::Point2f pos, float angle);
@@ -55,6 +56,10 @@ public:
 	void ResetSignCounter();
 	void GetSignProbabilities(std::map<std::string, float> &out);
 	void GetMostProbableSign(std::string &name, float &prob);
+
+	void WriteColor(cv::Mat &frame, const std::string &file);
+
+	void GetMap(cv::Mat &map) const;
 private:
 	struct Performance {
 		struct {
@@ -138,6 +143,7 @@ private:
 	cv::Mat _map;
 	cv::Mat _mapMask;
 	float _mapTileSize;
+	int _colorSpace;
 
 	std::map<std::string, float> _signsDetectedCounter;
 	float _totalDetectedCounter;

@@ -2,6 +2,9 @@
 #include "ImgProcessor.h"
 #include "Communication.h"
 
+#include <opencv2/highgui.hpp>
+
+using namespace cv;
 
 Control::Control(ImgProcessor * imgProcessor, Communication * comm) :
 	_state(State::Init), _img(imgProcessor), _comm(comm), _old("none"), _filter(0)
@@ -17,7 +20,10 @@ Control::~Control()
 
 void Control::Update(float deltaTime)
 {
-	
+	cv::Mat map;
+	_img->GetMap(map);
+	cv::resize(map, map, cv::Size(map.cols, map.rows) * 6, 0, 0, cv::INTER_NEAREST);
+	cv::imshow("MapBin", map);
 	std::map<std::string, float> detected;
 	switch (_state)
 	{

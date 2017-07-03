@@ -3,8 +3,8 @@
 #include <exception>
 #include <opencv2/imgproc.hpp>
 
-FeatureLibrary::FeatureLibrary(DetectorType type, int minHessian /* = 400 */) :
-	_type(type)
+FeatureLibrary::FeatureLibrary(DetectorType type, int colorSpace, int minHessian /* = 400 */) :
+	_type(type), _colorSpace(colorSpace)
 {
 	switch(type)
 	{
@@ -32,10 +32,22 @@ void FeatureLibrary::Add(FeatureType type, const std::string &name, const std::s
 	{
 		throw ImageReadException(("Could not open the image file. " + path).c_str());
 	}
-	cv::cvtColor(image, image, CV_BGR2Lab);
+	int lPlaneId;
+	switch (_colorSpace)
+	{
+	case 0:
+	default:
+		lPlaneId = 0;
+		cv::cvtColor(image, image, CV_BGR2Lab);
+		break;
+	case 1:
+		lPlaneId = 2;
+		cv::cvtColor(image, image, CV_BGR2HSV);
+		break;
+	}
 	std::vector<cv::Mat> planes(3);
 	cv::split(image, planes);
-	Add(type, name, planes[0]);
+	Add(type, name, planes[lPlaneId]);
 }
 
 void FeatureLibrary::Add(FeatureType type, const std::string &name, cv::Mat image)

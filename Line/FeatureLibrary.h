@@ -31,7 +31,7 @@ public:
 		Cascacade
 	};
 
-	FeatureLibrary(DetectorType type, int minHessian = 400);
+	FeatureLibrary(DetectorType type, int colorSpace, int minHessian = 400);
 	~FeatureLibrary();
 
 	void Add(FeatureType type, const std::string &name, const std::string &path);
@@ -73,4 +73,5 @@ private:
 	cv::Ptr<cv::DescriptorMatcher> _matcher;
 	cv::Ptr<cv::CLAHE> _clahe;
 	std::map<FeatureType, struct typeInfo> _featuremap;
+	int _colorSpace;
 };

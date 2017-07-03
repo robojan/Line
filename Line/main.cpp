@@ -17,6 +17,7 @@
 #include <Windows.h>
 #else
 #include <unistd.h>
+#include "main.h"
 #endif
 
 using namespace cv;
@@ -98,6 +99,9 @@ void mainLoopVideo(VideoCapture &video, ImgProcessor &processor, Control &contro
 		if (frame.empty()) {
 			break;
 		}
+		if (key == 'p') {
+			processor.WriteColor(frame, "lab.png");
+		}
 		processor.Process(frame, display, Point2f(1000,1000), 0);
 		int64 now = getTickCount();
 		double tickFrequency = getTickFrequency();
@@ -150,7 +154,7 @@ int main(int argc, char **argv)
 
 	printf("Loading feature library\n");
 	FeatureLibrary::DetectorType detectorType = (FeatureLibrary::DetectorType)options.GetDetectorType();
-	FeatureLibrary library(detectorType, 300);
+	FeatureLibrary library(detectorType, options.GetColorSpace(), 300);
 	try
 	{
 		switch(detectorType)
@@ -182,7 +186,7 @@ int main(int argc, char **argv)
 	}
 
 	ImgProcessor processor(options.GetProcessingResolution(), &library, options.IsAccelerated(), 
-		options.GetMapSize(), options.GetMapTileSize());
+		options.GetMapSize(), options.GetMapTileSize(), options.GetColorSpace());
 	processor.SetHorizon(options.GetHorizon());
 	processor.SetSkyLimit(options.GetSkyLimit());
 	processor.EnableDisplay(options.IsDebugMode());

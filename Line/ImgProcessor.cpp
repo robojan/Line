@@ -42,12 +42,18 @@ cv::Scalar ColorThreshold::High() const
 	return _high;
 }
 
-ImgProcessor::ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, bool accelerated, Size mapSize, float tileSize) :
+bool ColorThreshold::isHueWraped() const
+{
+	return _low[0] > _high[0];
+}
+
+ImgProcessor::ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, bool accelerated, Size mapSize, float tileSize, int colorSpace) :
 	_resolution(resolution), _displayEnabled(false), _features(featureLibrary),
 	_trackingFrames(0), _trackedFrames(0), _horizon(0.5f), 
 	_cameraCorrectionMat(Mat::eye(3, 3, CV_32F)), _cameraCorrectionDist(Mat::zeros(5, 1, CV_32F)),
 	_cameraCorrectionTSR(Mat::eye(3,3, CV_32F)),
-	_iptMat(Mat::eye(3, 3, CV_32F)), _map(Mat::zeros(mapSize, CV_32F)), _mapMask(Mat::zeros(mapSize, CV_32F)), _mapTileSize(tileSize)
+	_iptMat(Mat::eye(3, 3, CV_32F)), _map(Mat::zeros(mapSize, CV_32F)), _mapMask(Mat::zeros(mapSize, CV_32F)), _mapTileSize(tileSize),
+	_colorSpace(colorSpace)
 {
 	_clahe = createCLAHE();
 	_clahe->setClipLimit(2);
@@ -66,6 +72,7 @@ ImgProcessor::ImgProcessor(cv::Size resolution, FeatureLibrary *featureLibrary, 
 			_accelerator = new GLAccelerator("shaders/");
 			_accelerator->CreateProgram("cc", _resolution);
 			_accelerator->CreateProgram("thresh", Size(_resolution.width, int(_resolution.height * _horizon)));
+			_accelerator->SetProgramUniform("thresh", "colorspace", colorSpace);
 		} catch(GLAcceleratorException &e)
 		{
 			std::cerr << e.what() << std::endl;
@@ -134,7 +141,16 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display, cv::Point2f pos, fl
 
 		// Convert the colors to the LAB color space
 		t1 = t2;
-		cvtColor(camCorr, labFrame, CV_BGR2Lab);
+		switch(_colorSpace)
+		{
+		default:
+		case 0: //Lab
+			cvtColor(camCorr, labFrame, CV_BGR2Lab);
+			break;
+		case 1: // HSV
+			cvtColor(camCorr, labFrame, CV_BGR2HSV);
+			break;
+		}
 		t2 = getTickCount();
 		_perf.pre.bgr2lab = t2 - t1;
 	}
@@ -269,7 +285,18 @@ void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display, int horizon)
 	
 	// split
 	Mat planes[3];
-	Mat &LPlane = planes[0];
+	int lPlaneId;
+	switch(_colorSpace)
+	{
+	case 0:
+	default:
+		lPlaneId = 0;
+		break;
+	case 1:
+		lPlaneId = 2;
+		break;
+	}
+	Mat &LPlane = planes[lPlaneId];
 	split(frame, planes);
 
 	// Blur
@@ -381,6 +408,8 @@ void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display, int horizon)
 
 }
 
+
+
 void ImgProcessor::ProcessSigns(cv::Mat& frame, int frameGLTex, cv::Mat& display)
 {
 	int64 t1, t2;
@@ -394,7 +423,21 @@ void ImgProcessor::ProcessSigns(cv::Mat& frame, int frameGLTex, cv::Mat& display
 	if(_accelerator.empty())
 	{
 		inRange(frame, blueThresholds.Low(), blueThresholds.High(), blueMask);
-		inRange(frame, redThresholds.Low(), redThresholds.High(), redMask);
+		if(_colorSpace == 1 && redThresholds.isHueWraped())
+		{
+			Mat rmask1, rmask2;
+
+			Scalar low = redThresholds.Low();
+			Scalar high = redThresholds.High();
+
+			inRange(frame, Scalar(0, low[1], low[2]), high, rmask1);
+			inRange(frame, low, Scalar(255, high[1], high[2]), rmask2);
+
+			redMask = rmask1 | rmask2;
+		} else
+		{
+			inRange(frame, redThresholds.Low(), redThresholds.High(), redMask);
+		}
 		inRange(frame, yellowThresholds.Low(), yellowThresholds.High(), yellowMask);
 	} else
 	{
@@ -419,9 +462,13 @@ void ImgProcessor::ProcessSigns(cv::Mat& frame, int frameGLTex, cv::Mat& display
 	t2 = getTickCount();
 	_perf.sign.thresh = t2 - t1;
 
+	imshow("BlueThresholds", blueMask);
+	imshow("YellowThresholds", yellowMask);
+	imshow("RedThresholds", redMask);
+
 	// Erosion
 	t1 = t2;
-	erode(blueMask, blueMask, Mat(), Point(-1, -1), 1);
+	erode(blueMask, blueMask, Mat(), Point(-1, -1), 2);
 	erode(redMask, redMask, Mat(), Point(-1, -1), 1);
 	erode(yellowMask, yellowMask, Mat(), Point(-1, -1), 1);
 	t2 = getTickCount();
@@ -518,7 +565,18 @@ void ImgProcessor::ProcessSignContour(cv::Mat& frame, cv::Mat& display,
 
 		// illumination correction
 		Mat labPlanes[3];
-		Mat &lplane = labPlanes[0];
+		int lPlaneId;
+		switch (_colorSpace)
+		{
+		case 0:
+		default:
+			lPlaneId = 0;
+			break;
+		case 1:
+			lPlaneId = 2;
+			break;
+		}
+		Mat &lplane = labPlanes[lPlaneId];
 		split(signImage, labPlanes);
 
 		t1 = getTickCount();
@@ -628,8 +686,7 @@ void ImgProcessor::UpdateMap(const std::vector<cv::Vec4f>& lines, const std::vec
 		resize(display, display, Size(_map.cols, _map.rows)*6, 0, 0, INTER_NEAREST);
 		Mat flipped;
 		flip(display, flipped, 0);
-
-		imshow("Map", flipped);
+		//imshow("Map", flipped);
 	}
 }
 
@@ -697,6 +754,27 @@ void ImgProcessor::GetMostProbableSign(std::string &name, float &prob) {
 	name = temp;
 
 
+}
+
+void ImgProcessor::WriteColor(cv::Mat & frame, const std::string & file)
+{
+	// Scaling the image
+	ScaleFrame(frame, frame);
+
+	// Camera correction
+	Mat camCorr;
+	remap(frame, camCorr, _cameraMap1, _cameraMap2, INTER_LINEAR);
+	
+	// Convert the colors to the LAB color space
+	Mat labFrame;
+	cvtColor(camCorr, labFrame, CV_BGR2Lab);
+
+	imwrite(file, labFrame);
+}
+
+void ImgProcessor::GetMap(cv::Mat & map) const
+{
+	threshold(_map, map, 0.3, 1, THRESH_BINARY);
 }
 
 float getTimeMs(int64 time)
