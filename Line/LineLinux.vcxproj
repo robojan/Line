@@ -79,6 +79,7 @@
     <AdditionalSourcesToCopyMapping>resources/shaders/vert.glsl;resources/shaders/cc.glsl;resources/shaders/thresh.glsl;$(AdditionalSourcesToCopyMapping)</AdditionalSourcesToCopyMapping>
   </PropertyGroup>
   <ItemGroup>
+    <ClCompile Include="Communication.cpp" />
     <ClCompile Include="Control.cpp" />
     <ClCompile Include="FeatureLibrary.cpp" />
     <ClCompile Include="GLAccelerator.cpp" />
@@ -87,6 +88,7 @@
     <ClCompile Include="OptionsManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Communication.h" />
     <ClInclude Include="control.h" />
     <ClInclude Include="FeatureLibrary.h" />
     <ClInclude Include="GLAccelerator.h" />

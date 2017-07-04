@@ -759,11 +759,11 @@ void ImgProcessor::GetSignProbabilities(std::map<std::string, float>& out)
 }
 
 void ImgProcessor::GetMostProbableSign(std::string &name, float &prob) {
-	std::map<std::string, float> detected;
+	std::map<std::string, float> detectedSigns;
 	float max = 0;
 	std::string temp="none";
-	GetSignProbabilities(detected);
-	for (auto detected : detected) {
+	GetSignProbabilities(detectedSigns);
+	for (auto detected : detectedSigns) {
 		if (detected.second > max) {
 			max = detected.second;
 			temp = detected.first;

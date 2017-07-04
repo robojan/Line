@@ -20,11 +20,11 @@
  */
 
 
-class ControlException : public std::runtime_error
+class CommunicationException : public std::runtime_error
 {
 public:
-	ControlException(const char *msg) : std::runtime_error(msg) {}
-	ControlException(const std::string &msg) : std::runtime_error(msg) {}
+	CommunicationException(const char *msg) : std::runtime_error(msg) {}
+	CommunicationException(const std::string &msg) : std::runtime_error(msg) {}
 };
 
 class Communication {
@@ -41,16 +41,18 @@ public:
 
 	float GetEnergyIn();
 	float GetEnergyOut();
+	int GetReadyReceived() const;
 private:
 	std::string _devPath;
 	int _baud;
+	int _readyReceived;
 #ifndef _WIN32
 	void Connect();
 	void SendMessage(const std::string &msg);
 	bool GetMessage(std::string &msg);
 	void Tokenize(std::vector<std::string> &tokens, const std::string &msg);
 	void ProcessMessage(const char *str);
-	static void *ReadThread(Control *self);
+	static void *ReadThread(Communication *self);
 
 	int _fd;
 	bool _running;

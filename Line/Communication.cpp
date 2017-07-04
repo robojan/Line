@@ -1,5 +1,6 @@
 #include "Communication.h"
 
+#include <iostream>
 #ifndef _WIN32
 #include <unistd.h>
 #include <sys/types.h>
@@ -15,7 +16,7 @@
 #ifdef _WIN32
 
 Communication::Communication(const std::string & dev, int baud) :
-	_devPath(dev), _baud(baud)
+	_devPath(dev), _baud(baud), _readyReceived(0)
 {
 
 }
@@ -32,12 +33,14 @@ bool Communication::IsConnected()
 
 void Communication::Forward(int distance, int speed)
 {
-
+	std::cout << "Forward " << distance << std::endl;
+	_readyReceived++;
 }
 
 void Communication::Turn(int angle, int speed)
 {
-
+	std::cout << "Turn " << angle << std::endl;
+	_readyReceived++;
 }
 
 void Communication::Sweep(bool on)
@@ -53,6 +56,11 @@ float Communication::GetEnergyIn()
 float Communication::GetEnergyOut()
 {
 	return 0;
+}
+
+int Communication::GetReadyReceived() const
+{
+	return _readyReceived;
 }
 
 #else
@@ -179,11 +187,10 @@ void Communication::ProcessMessage(const char *str)
 		std::string type = tokens[0];
 		if (type == "ENERGY")
 		{
-			
 		}
-		else if (type == "POS")
+		else if (type == "READY")
 		{
-
+			_readyReceived++;
 		}
 		else {
 			fprintf(stderr, "Unknown msg received: %s\n", type.c_str());
@@ -192,6 +199,11 @@ void Communication::ProcessMessage(const char *str)
 	else {
 		printf("Arduino: %s\n", str);
 	}
+}
+
+int Communication::GetReadyReceived() const
+{
+	return _readyReceived;
 }
 
 void *Communication::ReadThread(Communication * self)

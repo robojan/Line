@@ -11,12 +11,12 @@ class Control
 {
 	enum class State {
 		Init,
-		Uturn,
+		Drive,
 		Stop,
-		Left,
-		Right,
-		Forward
-
+		UTurn,
+		FinishCommand,
+		DriveForwardTurnRight,
+		DriveForwardTurnLeft,
 
 	};
 
@@ -25,7 +25,9 @@ public:
 	~Control();
 
 	void Update(float deltaTime);
-	void Control::correctPos();
+	void correctPos();
+
+	static std::string GetStateName(State state);
 
 private:
 	void GetMapDistances(float &l, float &m, float &r);
@@ -37,6 +39,10 @@ private:
 	int _filter;
 	State _state;
 	bool _debug;
+	int _driveSpeed;
+	int _turnSpeed;
+	int _forwardDistance;
+	int _checkReadyReceived;
 };
 
 #endif

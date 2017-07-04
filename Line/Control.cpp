@@ -8,7 +8,7 @@ using namespace cv;
 
 Control::Control(ImgProcessor * imgProcessor, Communication * comm, bool debug) :
 	_state(State::Init), _img(imgProcessor), _comm(comm), _old("none"), _filter(0),
-	_debug(debug)
+	_debug(debug), _forwardDistance(50), _driveSpeed(40), _turnSpeed(40)
 {
 	assert(imgProcessor != nullptr);
 	assert(comm != nullptr);
@@ -23,93 +23,139 @@ void Control::Update(float deltaTime)
 {
 	float lineL, lineM, lineR;
 	GetMapDistances(lineL, lineM, lineR);
-	std::map<std::string, float> detected;
+	int detectedLines = 0;
+	detectedLines |= lineR < 15 ? 4 : 0;
+	detectedLines |= lineM < 15 ? 2 : 0;
+	detectedLines |= lineL < 15 ? 1 : 0;
+
+	int forwardDist = _forwardDistance;
+	if (!isinf(lineM)) {
+		forwardDist = min(forwardDist, int(lineM * 10) / 2);
+	}
 	switch (_state)
 	{
 	case State::Init: {
-		
-		
-		Control::correctPos();
-		//drive forward 
-		_comm->Forward(10, 80);
-		//if sign is detected
-
-		std::string name;
-		float prob;
-		//if detected sign right next state is right
-		//if detected sign left next state is left
-		//if detected sign forward next state is forward
-		//if detected sign stop next state is stop
-		//if detected sign uturn next state is uturn
-		_img->GetMostProbableSign(name, prob);
-		if (prob < 0.1) {
-			name = "none";
-		}
-		std::cout << name << std::endl;
-		if (name == _old) {
-			_filter = _filter + 1;
-			if (_filter > 5) {
-				if (name == "Left") {
-					_state = State::Left;
-				}
-				if (name == "Right") {
-					_state = State::Right;
-				}
-				if (name == "Uturn") {
-					_state = State::Uturn;
-				}
-				if (name == "Forward") {
-					_state = State::Forward;
-				}
-				if (name == "Stop") {
-					_state = State::Stop;
-				}
-
-			_filter = 0;
-			}
-		}
-		else {
-			_filter = 0;
-		}
-		_old = name;
-		//_img->ResetSignCounter();
-
+		_img->ResetSignCounter();
+		_state = State::Drive;
 		break;
 	}
-	case State::Left:
-
-		_state = State::Init;
+	case State::Drive: {
+		std::string sign;
+		float signProb;
+		_img->GetMostProbableSign(sign, signProb);
+		if (signProb >= 0.1 && sign == "Stop") {
+			_state = State::Stop;
+		}
+		else if (signProb >= 0.1 && sign == "UTurn") {
+			_state = State::UTurn;
+		}
+		else {
+			switch (detectedLines)
+			{
+			case 1:
+			case 4:
+			case 5: // Forward
+				_state = State::FinishCommand;
+				_checkReadyReceived = _comm->GetReadyReceived();
+				_comm->Forward(forwardDist, _driveSpeed);
+				break;
+			case 6: // Turn right
+				_state = State::DriveForwardTurnRight;
+				_checkReadyReceived = _comm->GetReadyReceived();
+				_comm->Forward(forwardDist, _driveSpeed);
+				break;
+			case 3: // Turn left
+				_state = State::DriveForwardTurnLeft;
+				_checkReadyReceived = _comm->GetReadyReceived();
+				_comm->Forward(forwardDist, _driveSpeed);
+				break;
+			case 0:
+			case 2: // Crossing
+				if (sign == "Left") {
+					_state = State::DriveForwardTurnLeft;
+					_checkReadyReceived = _comm->GetReadyReceived();
+					_comm->Forward(forwardDist, _driveSpeed);
+				}
+				else if (sign == "Right") {
+					_state = State::DriveForwardTurnRight;
+					_checkReadyReceived = _comm->GetReadyReceived();
+					_comm->Forward(forwardDist, _driveSpeed);
+				}
+				else {
+					_state = State::FinishCommand;
+					_checkReadyReceived = _comm->GetReadyReceived();
+					_comm->Forward(forwardDist, _driveSpeed);
+				}
+				_img->ResetSignCounter();
+				break;
+			case 7: // I Dunno, uturn maybe
+				std::cout << "I see all the lines" << std::endl;
+				_state = State::FinishCommand;
+				_checkReadyReceived = _comm->GetReadyReceived();
+				_comm->Forward(-20, _driveSpeed);
+				break;
+			}
+		}
 		break;
-
-	case State::Forward:
-		
-		_state = State::Init;
+	}
+	case State::FinishCommand: {
+		if (_checkReadyReceived != _comm->GetReadyReceived()) {
+			_state = State::Drive;
+		}
 		break;
-
-	case State::Right:
-
-		_state = State::Init;
+	}
+	case State::DriveForwardTurnLeft: {
+		if (_checkReadyReceived != _comm->GetReadyReceived()) {
+			_checkReadyReceived = _comm->GetReadyReceived();
+			_comm->Turn(-90, _turnSpeed);
+			_state = State::FinishCommand;
+		}
 		break;
-
-	case State::Uturn:
-		_comm->Turn(180, 50);
-		//todo wait untill turn is finished
-		
-		_state = State::Init;
+	}
+	case State::DriveForwardTurnRight: {
+		if (_checkReadyReceived != _comm->GetReadyReceived()) {
+			_checkReadyReceived = _comm->GetReadyReceived();
+			_comm->Turn(90, _turnSpeed);
+			_state = State::FinishCommand;
+		}
 		break;
-
-	case State::Stop:
-		_comm->Forward(0, 0);
-
+	}
+	case State::Stop: {
+		_img->ResetSignCounter();
+		// WHAT TO DO!?!?!
 		break;
+	}
+	case State::UTurn: {
+		_img->ResetSignCounter();
+		_checkReadyReceived = _comm->GetReadyReceived();
+		_comm->Turn(180, _turnSpeed);
+		_state = State::FinishCommand;
+		break;
+	}
 	default:
 		throw new std::runtime_error("Reached unknown state");
 	}
+	fprintf(stdout, "State: %s\n", GetStateName(_state).c_str());
 }
 
 void Control::correctPos() {
 
 
+}
+
+std::string Control::GetStateName(State state)
+{
+	switch (state)
+	{
+	case State::Init: return "Init";
+	case State::Drive: return "Drive";
+	case State::Stop: return "Stop";
+	case State::UTurn: return "UTurn";
+	case State::FinishCommand: return "FinishCommand";
+	case State::DriveForwardTurnLeft: return "DriveForwardTurnLeft";
+	case State::DriveForwardTurnRight: return "DriveForwardTurnRight";
+	default: return "Unknown";
+	}
 }
 
 void Control::GetMapDistances(float & l, float & m, float & r)

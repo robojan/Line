@@ -17,7 +17,6 @@
 #include <Windows.h>
 #else
 #include <unistd.h>
-#include "main.h"
 #endif
 
 using namespace cv;
@@ -154,7 +153,7 @@ int main(int argc, char **argv)
 
 	printf("Loading feature library\n");
 	FeatureLibrary::DetectorType detectorType = (FeatureLibrary::DetectorType)options.GetDetectorType();
-	FeatureLibrary library(detectorType, options.GetColorSpace(), 300);
+	FeatureLibrary library(detectorType, options.GetColorSpace(), 100);
 	try
 	{
 		switch(detectorType)

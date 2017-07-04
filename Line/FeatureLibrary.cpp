@@ -13,7 +13,7 @@ FeatureLibrary::FeatureLibrary(DetectorType type, int colorSpace, int minHessian
 		_clahe->setClipLimit(2);
 	case DetectorType::SURF:
 		_matcher = cv::BFMatcher::create(cv::NORM_L2, true);
-		_detector = cv::xfeatures2d::SURF::create(minHessian);
+		_detector = cv::xfeatures2d::SURF::create(minHessian, 4,2,true,true);
 	case DetectorType::Cascacade:
 
 		break;
