@@ -117,11 +117,29 @@ void Control::GetMapDistances(float & l, float & m, float & r)
 	cv::Mat map;
 	_img->GetMap(map);
 
-	std::vector<cv::Vec4f> lines;
-	HoughLinesP(map, lines, 2, 30 * CV_PI / 180, 5, 4, 2);
+	//std::vector<cv::Vec4f> lines;
+	//HoughLinesP(map, lines, 2, 30 * CV_PI / 180, 5, 4, 2);
 
 	Point2f origin(map.cols / 2, 0);
-	m = GetMapIntersection(map, origin, 0, 0.5);
+	const float lAngle = 30 * CV_PI / 180;
+	const float rAngle = -lAngle;
+	const float dAngle = 5 * CV_PI / 180;
+	float m1, m2, m3;
+	float l1, l2, l3;
+	float r1, r2, r3;
+	l1 = GetMapIntersection(map, origin, lAngle - dAngle, 0.25);
+	l2 = GetMapIntersection(map, origin, lAngle, 0.25);
+	l3 = GetMapIntersection(map, origin, lAngle + dAngle, 0.25);
+	m1 = GetMapIntersection(map, origin, 0 - dAngle, 0.25);
+	m2 = GetMapIntersection(map, origin, 0, 0.25);
+	m3 = GetMapIntersection(map, origin, 0 + dAngle, 0.25);
+	r1 = GetMapIntersection(map, origin, rAngle - dAngle, 0.25);
+	r2 = GetMapIntersection(map, origin, rAngle, 0.25);
+	r3 = GetMapIntersection(map, origin, rAngle + dAngle, 0.25);
+	
+	l = min(l1, min(l2, l3));
+	m = min(m1, min(m2, m3));
+	r = min(r1, min(r2, r3));
 
 
 	if (_debug) {
@@ -130,7 +148,7 @@ void Control::GetMapDistances(float & l, float & m, float & r)
 		const float scale = 4;
 		resize(map, display, Size(map.cols*scale, map.rows*scale), scale, scale, CV_INTER_NN);
 		cvtColor(display, display, CV_GRAY2BGR);
-
+		/*
 		Scalar lineColor(0, 0, 255);
 		for (auto line : lines) {
 			Point2f a(line[0], line[1]);
@@ -138,23 +156,41 @@ void Control::GetMapDistances(float & l, float & m, float & r)
 			a *= scale;
 			b *= scale;
 			cv::line(display, a, b, lineColor, 2);
-		}
+		}*/
+		float maxDist = sqrt(map.cols * map.cols + map.rows * map.rows);
+		Scalar projectColor(0, 255, 0);
+		
+		float dist;
+		dist = min(maxDist, l);
+		Point2f lPoint = origin + Point2f(sin(lAngle)*dist, cos(lAngle)*dist);
+		dist = min(maxDist, m);
+		Point2f mPoint = origin + Point2f(sin(0)*dist, cos(0)*dist);
+		dist = min(maxDist, r);
+		Point2f rPoint = origin + Point2f(sin(rAngle)*dist, cos(rAngle)*dist);
 
+		line(display, origin * scale, lPoint * scale, projectColor, 2);
+		line(display, origin * scale, mPoint * scale, projectColor, 2);
+		line(display, origin * scale, rPoint * scale, projectColor, 2);
 		imshow("map", display);
 	}
-
-	
-
-	l = INFINITY;
-	m = INFINITY;
-	r = INFINITY;
 }
 
 float Control::GetMapIntersection(Mat map, Point2f start, float angle, float stepSize)
 {
-	Point2f pos = start;
-	
-	Point pixel = 
-
-	return 0.0f;
+	Rect mapRect(0, 0, map.cols, map.rows);
+	float dist = 0;
+	while (true)
+	{
+		Point2f pos = start + Point2f(sin(angle)*dist, cos(angle)*dist);
+		Point pixel(pos + Point2f(0.5f, 0.5f));
+		if (!mapRect.contains(pixel))
+		{
+			break;
+		}
+		if (map.at<uchar>(pixel) > 128) {
+			return dist;
+		}
+		dist += stepSize;
+	}
+	return INFINITY;
 }
