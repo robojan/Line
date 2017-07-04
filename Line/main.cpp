@@ -205,7 +205,7 @@ int main(int argc, char **argv)
 	}
 
 	Communication communication(options.GetControlDevice(), options.GetBaudRate());
-	Control control(&processor, &communication);
+	Control control(&processor, &communication, options.IsDebugMode());
 
 	std::string captureDevice = options.GetCaptureDevice();
 	if (captureDevice.empty())

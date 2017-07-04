@@ -6,8 +6,9 @@
 
 using namespace cv;
 
-Control::Control(ImgProcessor * imgProcessor, Communication * comm) :
-	_state(State::Init), _img(imgProcessor), _comm(comm), _old("none"), _filter(0)
+Control::Control(ImgProcessor * imgProcessor, Communication * comm, bool debug) :
+	_state(State::Init), _img(imgProcessor), _comm(comm), _old("none"), _filter(0),
+	_debug(debug)
 {
 	assert(imgProcessor != nullptr);
 	assert(comm != nullptr);
@@ -20,10 +21,8 @@ Control::~Control()
 
 void Control::Update(float deltaTime)
 {
-	cv::Mat map;
-	_img->GetMap(map);
-	cv::resize(map, map, cv::Size(map.cols, map.rows) * 6, 0, 0, cv::INTER_NEAREST);
-	cv::imshow("MapBin", map);
+	float lineL, lineM, lineR;
+	GetMapDistances(lineL, lineM, lineR);
 	std::map<std::string, float> detected;
 	switch (_state)
 	{
@@ -111,4 +110,51 @@ void Control::Update(float deltaTime)
 void Control::correctPos() {
 
 
+}
+
+void Control::GetMapDistances(float & l, float & m, float & r)
+{
+	cv::Mat map;
+	_img->GetMap(map);
+
+	std::vector<cv::Vec4f> lines;
+	HoughLinesP(map, lines, 2, 30 * CV_PI / 180, 5, 4, 2);
+
+	Point2f origin(map.cols / 2, 0);
+	m = GetMapIntersection(map, origin, 0, 0.5);
+
+
+	if (_debug) {
+
+		Mat display;
+		const float scale = 4;
+		resize(map, display, Size(map.cols*scale, map.rows*scale), scale, scale, CV_INTER_NN);
+		cvtColor(display, display, CV_GRAY2BGR);
+
+		Scalar lineColor(0, 0, 255);
+		for (auto line : lines) {
+			Point2f a(line[0], line[1]);
+			Point2f b(line[2], line[3]);
+			a *= scale;
+			b *= scale;
+			cv::line(display, a, b, lineColor, 2);
+		}
+
+		imshow("map", display);
+	}
+
+	
+
+	l = INFINITY;
+	m = INFINITY;
+	r = INFINITY;
+}
+
+float Control::GetMapIntersection(Mat map, Point2f start, float angle, float stepSize)
+{
+	Point2f pos = start;
+	
+	Point pixel = 
+
+	return 0.0f;
 }

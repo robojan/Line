@@ -680,7 +680,8 @@ void ImgProcessor::UpdateSignCounter()
 
 void ImgProcessor::UpdateMap(const std::vector<cv::Vec4f>& lines, const std::vector<cv::Point2f>& visible)
 {
-	Mat newMap = _mapMask.clone();
+	//Mat newMap = _mapMask.clone();
+	Mat newMap = Mat::zeros(_map.rows, _map.cols, CV_32F);
 	Point2f offset(_map.cols / 2, 0);
 	for(Vec4f line : lines)
 	{
@@ -793,6 +794,7 @@ void ImgProcessor::WriteColor(cv::Mat & frame, const std::string & file)
 void ImgProcessor::GetMap(cv::Mat & map) const
 {
 	threshold(_map, map, 0.3, 1, THRESH_BINARY);
+	map.convertTo(map, CV_8UC1, 255, 0);
 }
 
 float getTimeMs(int64 time)
