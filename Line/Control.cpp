@@ -8,7 +8,7 @@ using namespace cv;
 
 Control::Control(ImgProcessor * imgProcessor, Communication * comm, bool debug) :
 	_state(State::Init), _img(imgProcessor), _comm(comm), _old("none"), _filter(0),
-	_debug(debug), _forwardDistance(50), _driveSpeed(40), _turnSpeed(40)
+	_debug(debug), _forwardDistance(20), _driveSpeed(40), _turnSpeed(40)
 {
 	assert(imgProcessor != nullptr);
 	assert(comm != nullptr);
@@ -24,13 +24,16 @@ void Control::Update(float deltaTime)
 	float lineL, lineM, lineR;
 	GetMapDistances(lineL, lineM, lineR);
 	int detectedLines = 0;
-	detectedLines |= lineR < 15 ? 4 : 0;
-	detectedLines |= lineM < 15 ? 2 : 0;
-	detectedLines |= lineL < 15 ? 1 : 0;
+	detectedLines |= lineR < 8 ? 1 : 0;
+	detectedLines |= lineM < 10 ? 2 : 0;
+	detectedLines |= lineL < 8 ? 4 : 0;
+	std::string sign;
+	float signProb;
+	_img->GetMostProbableSign(sign, signProb);
 
-	int forwardDist = _forwardDistance;
+	int forwardDist = 100;
 	if (!isinf(lineM)) {
-		forwardDist = min(forwardDist, int(lineM * 10) / 2);
+		forwardDist = min(forwardDist, int(lineM * 10) -30);
 	}
 	switch (_state)
 	{
@@ -40,14 +43,16 @@ void Control::Update(float deltaTime)
 		break;
 	}
 	case State::Drive: {
-		std::string sign;
-		float signProb;
-		_img->GetMostProbableSign(sign, signProb);
 		if (signProb >= 0.1 && sign == "Stop") {
 			_state = State::Stop;
 		}
 		else if (signProb >= 0.1 && sign == "UTurn") {
 			_state = State::UTurn;
+		}
+		else if (detectedLines == 5 && abs(lineR - lineL) > 1) {
+			_checkReadyReceived = _comm->GetReadyReceived();
+			_comm->Turn(lineR -lineL > 0 ? 2 : -2, _turnSpeed);
+			_state = State::FinishCommand;
 		}
 		else {
 			switch (detectedLines)
@@ -57,7 +62,7 @@ void Control::Update(float deltaTime)
 			case 5: // Forward
 				_state = State::FinishCommand;
 				_checkReadyReceived = _comm->GetReadyReceived();
-				_comm->Forward(forwardDist, _driveSpeed);
+				_comm->Forward(20, _driveSpeed);
 				break;
 			case 6: // Turn right
 				_state = State::DriveForwardTurnRight;
@@ -104,9 +109,17 @@ void Control::Update(float deltaTime)
 		}
 		break;
 	}
+	case State::SignFinishedCommand: {
+		if (_checkReadyReceived != _comm->GetReadyReceived()) {
+			_state = State::Drive;
+			_img->ResetSignCounter();
+		}
+		break;
+	}
 	case State::DriveForwardTurnLeft: {
 		if (_checkReadyReceived != _comm->GetReadyReceived()) {
 			_checkReadyReceived = _comm->GetReadyReceived();
+			_img->ResetSignCounter();
 			_comm->Turn(-90, _turnSpeed);
 			_state = State::FinishCommand;
 		}
@@ -115,6 +128,7 @@ void Control::Update(float deltaTime)
 	case State::DriveForwardTurnRight: {
 		if (_checkReadyReceived != _comm->GetReadyReceived()) {
 			_checkReadyReceived = _comm->GetReadyReceived();
+			_img->ResetSignCounter();
 			_comm->Turn(90, _turnSpeed);
 			_state = State::FinishCommand;
 		}
@@ -128,14 +142,27 @@ void Control::Update(float deltaTime)
 	case State::UTurn: {
 		_img->ResetSignCounter();
 		_checkReadyReceived = _comm->GetReadyReceived();
-		_comm->Turn(180, _turnSpeed);
-		_state = State::FinishCommand;
+		int forwardDist = 100;
+		if (!isinf(lineM)) {
+			forwardDist = min(forwardDist, int(lineM * 10) / 2);
+		}
+		_comm->Forward(forwardDist, _driveSpeed);
+		_state = State::DriveForwardUTurn;
+		break;
+	}
+	case State::DriveForwardUTurn: {
+		if (_checkReadyReceived != _comm->GetReadyReceived()) {
+			_checkReadyReceived = _comm->GetReadyReceived();
+			_img->ResetSignCounter();
+			_comm->Turn(180, _turnSpeed);
+			_state = State::FinishCommand;
+		}
 		break;
 	}
 	default:
 		throw new std::runtime_error("Reached unknown state");
 	}
-	fprintf(stdout, "State: %s\n", GetStateName(_state).c_str());
+	fprintf(stdout, "State: %s, Sign: %s(%g), lines: %g %g %g\n", GetStateName(_state).c_str(), sign.c_str(), signProb, lineL, lineM, lineR);
 }
 
 void Control::correctPos() {
@@ -154,6 +181,7 @@ std::string Control::GetStateName(State state)
 	case State::FinishCommand: return "FinishCommand";
 	case State::DriveForwardTurnLeft: return "DriveForwardTurnLeft";
 	case State::DriveForwardTurnRight: return "DriveForwardTurnRight";
+	case State::DriveForwardUTurn: return "DriveForwardUTurn";
 	default: return "Unknown";
 	}
 }
@@ -167,7 +195,7 @@ void Control::GetMapDistances(float & l, float & m, float & r)
 	//HoughLinesP(map, lines, 2, 30 * CV_PI / 180, 5, 4, 2);
 
 	Point2f origin(map.cols / 2, 0);
-	const float lAngle = 30 * CV_PI / 180;
+	const float lAngle = -30 * CV_PI / 180;
 	const float rAngle = -lAngle;
 	const float dAngle = 5 * CV_PI / 180;
 	float m1, m2, m3;

@@ -153,7 +153,7 @@ int main(int argc, char **argv)
 
 	printf("Loading feature library\n");
 	FeatureLibrary::DetectorType detectorType = (FeatureLibrary::DetectorType)options.GetDetectorType();
-	FeatureLibrary library(detectorType, options.GetColorSpace(), 100);
+	FeatureLibrary library(detectorType, options.GetColorSpace(), 500);
 	try
 	{
 		switch(detectorType)

@@ -15,9 +15,10 @@ class Control
 		Stop,
 		UTurn,
 		FinishCommand,
+		SignFinishedCommand,
 		DriveForwardTurnRight,
 		DriveForwardTurnLeft,
-
+		DriveForwardUTurn,
 	};
 
 public:

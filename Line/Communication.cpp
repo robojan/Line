@@ -146,6 +146,8 @@ void Communication::Connect()
 
 	tcsetattr(fd, TCSANOW, &tio);
 	_fd = fd;
+
+	sleep(3);
 }
 void Communication::SendMessage(const std::string & msg)
 {

@@ -93,6 +93,7 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display, cv::Point2f pos, fl
 	Mat camCorr;
 	Mat labFrame;
 	int labGLFrame = 0;
+	//imshow("input", frame);
 	if(!_accelerator.empty())
 	{
 		_perf.pre.scale = 0;
@@ -110,6 +111,7 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display, cv::Point2f pos, fl
 		remap(frame, camCorr, _cameraMap1, _cameraMap2, INTER_LINEAR, BORDER_TRANSPARENT);
 		t2 = getTickCount();
 		_perf.pre.cam = t2 - t1;
+		//imshow("lens correction", camCorr);
 
 		t1 = t2;
 		_accelerator->ProcessFrame("cc", frame);
@@ -691,7 +693,7 @@ void ImgProcessor::UpdateMap(const std::vector<cv::Vec4f>& lines, const std::vec
 		b /= _mapTileSize;
 		cv::line(newMap, a + offset, b + offset, Scalar(1.0f));
 	}
-	addWeighted(_map, 0.8, newMap, 0.2, 0, _map);
+	addWeighted(_map, 0.5, newMap, 0.5, 0, _map);
 	if(_displayEnabled)
 	{
 		CV_Assert(visible.size() == 4);
