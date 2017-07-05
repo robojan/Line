@@ -43,10 +43,10 @@ void Control::Update(float deltaTime)
 		break;
 	}
 	case State::Drive: {
-		if (signProb >= 20 && sign == "Stop") {
+		if (signProb >= 10 && sign == "Stop") {
 			_state = State::Stop;
 		}
-		else if (signProb >= 20 && sign == "UTurn") {
+		else if (signProb >= 10 && sign == "UTurn") {
 			_state = State::UTurn;
 		}
 		else if (detectedLines == 5 && abs(lineR - lineL) > 1) {
@@ -76,12 +76,12 @@ void Control::Update(float deltaTime)
 				break;
 			case 0:
 			case 2: // Crossing
-				if (sign == "Left" && signProb > 15) {
+				if (sign == "Left" && signProb > 5) {
 					_state = State::DriveForwardTurnLeft;
 					_checkReadyReceived = _comm->GetReadyReceived();
 					_comm->Forward(forwardDist, _driveSpeed);
 				}
-				else if (sign == "Right" && signProb > 15) {
+				else if (sign == "Right" && signProb > 5) {
 					_state = State::DriveForwardTurnRight;
 					_checkReadyReceived = _comm->GetReadyReceived();
 					_comm->Forward(forwardDist, _driveSpeed);

@@ -158,7 +158,7 @@ int main(int argc, char **argv)
 
 	printf("Loading feature library\n");
 	FeatureLibrary::DetectorType detectorType = (FeatureLibrary::DetectorType)options.GetDetectorType();
-	FeatureLibrary library(detectorType, options.GetColorSpace(), 300);
+	FeatureLibrary library(detectorType, options.GetColorSpace(), 3000);
 	try
 	{
 		switch(detectorType)
@@ -170,7 +170,7 @@ int main(int argc, char **argv)
 			library.Add(FeatureType::BlueSign, "Forward", "signs/straight_64.jpg");
 			library.Add(FeatureType::RedSign, "Stop", "signs/stop_64.jpg");
 			library.Add(FeatureType::YellowSign, "UTurn", "signs/uturn_64.jpg");
-			library.Add(FeatureType::BlueSign, "Left", "signs/left_128.jpg");
+			/*library.Add(FeatureType::BlueSign, "Left", "signs/left_128.jpg");
 			library.Add(FeatureType::BlueSign, "Right", "signs/right_128.jpg");
 			library.Add(FeatureType::BlueSign, "Forward", "signs/straight_128.jpg");
 			library.Add(FeatureType::RedSign, "Stop", "signs/stop_128.jpg");
@@ -187,7 +187,7 @@ int main(int argc, char **argv)
 			library.Add(FeatureType::RedSign, "Stop", "signs/stop1.png");
 			library.Add(FeatureType::RedSign, "Stop", "signs/stop2.png");
 			library.Add(FeatureType::RedSign, "Stop", "signs/stop3.png");
-			library.Add(FeatureType::RedSign, "Stop", "signs/stop4.png");
+			library.Add(FeatureType::RedSign, "Stop", "signs/stop4.png");*/
 			break;
 		case FeatureLibrary::DetectorType::Cascacade:
 			library.AddCascade(FeatureType::BlueSign, "Left", "cascade/left/cascade.xml");

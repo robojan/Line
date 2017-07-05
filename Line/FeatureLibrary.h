@@ -61,6 +61,8 @@ private:
 		cv::CascadeClassifier classifier;
 		cv::Mat descriptor;
 		cv::Mat image;
+		cv::Ptr<cv::xfeatures2d::SURF> detector;
+		cv::Ptr<cv::DescriptorMatcher> matcher;
 	};
 
 	struct typeInfo
@@ -69,8 +71,6 @@ private:
 		std::map<std::string, struct featureInfo> objects;
 	};
 	DetectorType _type;
-	cv::Ptr<cv::xfeatures2d::SURF> _detector;
-	cv::Ptr<cv::DescriptorMatcher> _matcher;
 	cv::Ptr<cv::CLAHE> _clahe;
 	std::map<FeatureType, struct typeInfo> _featuremap;
 	int _colorSpace;

@@ -13,8 +13,6 @@ FeatureLibrary::FeatureLibrary(DetectorType type, int colorSpace, int minHessian
 		_clahe = cv::createCLAHE();
 		_clahe->setClipLimit(2);
 	case DetectorType::SURF:
-		_matcher = cv::BFMatcher::create(cv::NORM_L2, true);
-		_detector = cv::xfeatures2d::SURF::create(minHessian, 4,2,true,true);
 	case DetectorType::Cascacade:
 
 		break;
@@ -59,13 +57,18 @@ void FeatureLibrary::Add(FeatureType type, const std::string &name, cv::Mat imag
 	switch(_type)
 	{
 	case DetectorType::SURFIllumCanny:
+
+		info.matcher = cv::BFMatcher::create(cv::NORM_L2, false);
+		info.detector = cv::xfeatures2d::SURF::create(500, 2, 4, true, true);
 		_clahe->apply(image, illumCorrected);
 		cv::Canny(illumCorrected, illumCorrected, 150, 200, 3);
-		_detector->detectAndCompute(illumCorrected, cv::Mat(), info.keypoints, info.descriptor);
+		info.detector->detectAndCompute(illumCorrected, cv::Mat(), info.keypoints, info.descriptor);
 		info.image = illumCorrected;
 		break;
 	case DetectorType::SURF:
-		_detector->detectAndCompute(image, cv::Mat(), info.keypoints, info.descriptor);
+		info.matcher = cv::BFMatcher::create(cv::NORM_L2, false);
+		info.detector = cv::xfeatures2d::SURF::create(500, 2, 4, true, true);
+		info.detector->detectAndCompute(image, cv::Mat(), info.keypoints, info.descriptor);
 		info.image = image;
 		break;
 	default:
@@ -203,13 +206,13 @@ bool FeatureLibrary::FindMatchSURFIllumCanny(FeatureType type, const std::string
 	struct featureInfo &objectInfo = _featuremap.at(type).objects.at(name);
 
 	struct featureInfo sceneInfo;
-	_detector->detectAndCompute(image, cv::Mat(), sceneInfo.keypoints, sceneInfo.descriptor);
+	objectInfo.detector->detectAndCompute(image, cv::Mat(), sceneInfo.keypoints, sceneInfo.descriptor);
 
 	if (sceneInfo.descriptor.rows == 0)
 		return false;
 
 	// Match descriptor 
-	_matcher->match(objectInfo.descriptor, sceneInfo.descriptor, matches);
+	objectInfo.matcher->match(objectInfo.descriptor, sceneInfo.descriptor, matches);
 
 	// Find max and min distances
 	double max_dist = 0;
@@ -237,11 +240,11 @@ bool FeatureLibrary::FindMatchSURFIllumCanny(FeatureType type, const std::string
 	cv::Mat img_matches;
 	cv::drawMatches(objectInfo.image, objectInfo.keypoints, image, sceneInfo.keypoints, goodMatches, img_matches,
 		cv::Scalar::all(-1), cv::Scalar::all(-1), std::vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-	//imshow("Sign: matches " + name, img_matches);
+	imshow("Sign: matches " + name, img_matches);
 	if (minDist) *minDist = min_dist;
 	if (maxDist) *maxDist = max_dist;
 	if (avgDist) *avgDist = avg_dist;
-	return avg_dist <= 0.45;
+	return avg_dist <= 0.8;
 }
 
 bool FeatureLibrary::FindMatchCascade(FeatureType type, const std::string name, cv::Mat & image, double* avgDist, double* minDist, double* maxDist)

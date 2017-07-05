@@ -497,8 +497,8 @@ void ImgProcessor::ProcessSigns(cv::Mat& frame, int frameGLTex, cv::Mat& display
 
 	//imshow("Sign: BlueThresholds", blueMask);
 	//imshow("Sign: YellowThresholds", yellowMask);
-	//imshow("Sign: RedThresholds", redMask);
-
+	imshow("Sign: RedThresholds", redMask);
+	/*
 	// Dilation
 	t1 = t2;
 	dilate(blueMask, blueMask, Mat(), Point(-1, -1), 3);
@@ -510,8 +510,8 @@ void ImgProcessor::ProcessSigns(cv::Mat& frame, int frameGLTex, cv::Mat& display
 
 	//imshow("Sign: Blue Dilate", blueMask);
 	//imshow("Sign: Yellow Dilate", yellowMask);
-	//imshow("Sign: Red Dilate", redMask);
-
+	imshow("Sign: Red Dilate", redMask);
+	
 	// Erosion
 	t1 = t2;
 	erode(blueMask, blueMask, Mat(), Point(-1, -1), 2);
@@ -522,7 +522,7 @@ void ImgProcessor::ProcessSigns(cv::Mat& frame, int frameGLTex, cv::Mat& display
 
 	//imshow("Sign: Blue Erosion", blueMask);
 	//imshow("Sign: Yellow Erosion", yellowMask);
-	//imshow("Sign: Red Erosion", redMask);
+	imshow("Sign: Red Erosion", redMask);*/
 
 	// Contours
 	t1 = t2;
@@ -815,7 +815,7 @@ void ImgProcessor::WriteColor(cv::Mat & frame, const std::string & file)
 	
 	// Convert the colors to the LAB color space
 	Mat labFrame;
-	cvtColor(camCorr, labFrame, CV_BGR2Lab);
+	cvtColor(camCorr, labFrame, CV_BGR2HSV);
 
 	imwrite(file, labFrame);
 }
