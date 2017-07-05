@@ -24,9 +24,9 @@ void Control::Update(float deltaTime)
 	float lineL, lineM, lineR;
 	GetMapDistances(lineL, lineM, lineR);
 	int detectedLines = 0;
-	detectedLines |= lineR < 12 ? 1 : 0;
-	detectedLines |= lineM < 15 ? 2 : 0;
-	detectedLines |= lineL < 12 ? 4 : 0;
+	detectedLines |= lineR < 8 ? 1 : 0;
+	detectedLines |= lineM < 10 ? 2 : 0;
+	detectedLines |= lineL < 8 ? 4 : 0;
 	std::string sign;
 	float signProb;
 	_img->GetMostProbableSign(sign, signProb);
@@ -43,10 +43,10 @@ void Control::Update(float deltaTime)
 		break;
 	}
 	case State::Drive: {
-		if (signProb >= 0.1 && sign == "Stop") {
+		if (signProb >= 20 && sign == "Stop") {
 			_state = State::Stop;
 		}
-		else if (signProb >= 0.1 && sign == "UTurn") {
+		else if (signProb >= 20 && sign == "UTurn") {
 			_state = State::UTurn;
 		}
 		else if (detectedLines == 5 && abs(lineR - lineL) > 1) {
@@ -76,12 +76,12 @@ void Control::Update(float deltaTime)
 				break;
 			case 0:
 			case 2: // Crossing
-				if (sign == "Left") {
+				if (sign == "Left" && signProb > 15) {
 					_state = State::DriveForwardTurnLeft;
 					_checkReadyReceived = _comm->GetReadyReceived();
 					_comm->Forward(forwardDist, _driveSpeed);
 				}
-				else if (sign == "Right") {
+				else if (sign == "Right" && signProb > 15) {
 					_state = State::DriveForwardTurnRight;
 					_checkReadyReceived = _comm->GetReadyReceived();
 					_comm->Forward(forwardDist, _driveSpeed);

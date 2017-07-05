@@ -93,7 +93,7 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display, cv::Point2f pos, fl
 	Mat camCorr;
 	Mat labFrame;
 	int labGLFrame = 0;
-	imshow("input", frame);
+	//imshow("input", frame);
 	if(!_accelerator.empty())
 	{
 		_perf.pre.scale = 0;
@@ -131,7 +131,7 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display, cv::Point2f pos, fl
 		remap(frame, camCorr, _cameraMap1, _cameraMap2, INTER_LINEAR);
 		t2 = getTickCount();
 		_perf.pre.cam = t2 - t1;
-		imshow("lens correction", camCorr);
+		//imshow("lens correction", camCorr);
 
 		// Clone the frame for output
 		t1 = t2;
@@ -156,7 +156,7 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display, cv::Point2f pos, fl
 		}
 		t2 = getTickCount();
 		_perf.pre.bgr2lab = t2 - t1;
-		imshow("color conversion", labFrame);
+		//imshow("color conversion", labFrame);
 	}
 
 	// Split the frame
@@ -175,8 +175,8 @@ void ImgProcessor::Process(cv::Mat& frame, cv::Mat& display, cv::Point2f pos, fl
 	Mat skyImg = labFrame(Range(skyLimit, horizon), Range::all());
 	t2 = getTickCount();
 	_perf.pre.split = t2 - t1;
-	imshow("signInput", skyImg);
-	imshow("street input", streetImg);
+	//imshow("signInput", skyImg);
+	//imshow("street input", streetImg);
 
 	// Process the rest
 	ProcessLines(streetImg, streetDisplay, horizon);
@@ -305,13 +305,13 @@ void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display, int horizon)
 	Mat &LPlane = planes[lPlaneId];
 	split(frame, planes);
 
-	imshow("Lines: split", LPlane);
+	//imshow("Lines: split", LPlane);
 
 	Mat illumCorrected;
 	_clahe->apply(LPlane, illumCorrected);
 	//Mat &illumCorrected = LPlane;
 
-	imshow("Lines: illumination correction", illumCorrected);
+	//imshow("Lines: illumination correction", illumCorrected);
 
 	// Blur
 	t1 = getTickCount();
@@ -319,7 +319,7 @@ void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display, int horizon)
 	GaussianBlur(illumCorrected, blurred, Size(3, 3), 5, 5, BORDER_DEFAULT);
 	t2 = getTickCount();
 	_perf.line.blur = t2 - t1;
-	imshow("Blur", blurred);
+	//imshow("Blur", blurred);
 
 	Mat edges;
 	if(_lineMode == 0)
@@ -362,13 +362,13 @@ void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display, int horizon)
 		//inRange(blurred, loVal, hiVal, mask);
 		threshold(blurred, mask, loVal, 255, THRESH_BINARY);
 
-		imshow("Lines: Mask", mask);
+		//imshow("Lines: Mask", mask);
 
 		dilate(mask, mask, Mat(), Point(-1, -1), 2);
 		//mask = 255 - mask;
 		t2 = getTickCount();
 		_perf.line.mask = t2 - t1;
-		imshow("Lines: Dilate", mask);
+		//imshow("Lines: Dilate", mask);
 
 		// Canny
 		t1 = t2;
@@ -384,7 +384,7 @@ void ImgProcessor::ProcessLines(cv::Mat& frame, cv::Mat& display, int horizon)
 		_perf.line.canny = t2 - t1;
 		edges = edges(Rect(0, 0, edges.cols, edges.rows - 80));
 	}
-	imshow("Lines: Canny", edges);
+	//imshow("Lines: Canny", edges);
 
 
 
@@ -495,9 +495,9 @@ void ImgProcessor::ProcessSigns(cv::Mat& frame, int frameGLTex, cv::Mat& display
 	t2 = getTickCount();
 	_perf.sign.thresh = t2 - t1;
 
-	imshow("Sign: BlueThresholds", blueMask);
-	imshow("Sign: YellowThresholds", yellowMask);
-	imshow("Sign: RedThresholds", redMask);
+	//imshow("Sign: BlueThresholds", blueMask);
+	//imshow("Sign: YellowThresholds", yellowMask);
+	//imshow("Sign: RedThresholds", redMask);
 
 	// Dilation
 	t1 = t2;
@@ -508,9 +508,9 @@ void ImgProcessor::ProcessSigns(cv::Mat& frame, int frameGLTex, cv::Mat& display
 	_perf.sign.dilation = t2 - t1;
 
 
-	imshow("Sign: Blue Dilate", blueMask);
-	imshow("Sign: Yellow Dilate", yellowMask);
-	imshow("Sign: Red Dilate", redMask);
+	//imshow("Sign: Blue Dilate", blueMask);
+	//imshow("Sign: Yellow Dilate", yellowMask);
+	//imshow("Sign: Red Dilate", redMask);
 
 	// Erosion
 	t1 = t2;
@@ -520,9 +520,9 @@ void ImgProcessor::ProcessSigns(cv::Mat& frame, int frameGLTex, cv::Mat& display
 	t2 = getTickCount();
 	_perf.sign.erosion = t2 - t1;
 
-	imshow("Sign: Blue Erosion", blueMask);
-	imshow("Sign: Yellow Erosion", yellowMask);
-	imshow("Sign: Red Erosion", redMask);
+	//imshow("Sign: Blue Erosion", blueMask);
+	//imshow("Sign: Yellow Erosion", yellowMask);
+	//imshow("Sign: Red Erosion", redMask);
 
 	// Contours
 	t1 = t2;
@@ -604,7 +604,7 @@ void ImgProcessor::ProcessSignContour(cv::Mat& frame, cv::Mat& display,
 
 		Mat signImage = frame(rect);
 		
-		imshow("Sign: signImage", signImage);
+		//imshow("Sign: signImage", signImage);
 
 		// illumination correction
 		Mat labPlanes[3];
@@ -622,7 +622,7 @@ void ImgProcessor::ProcessSignContour(cv::Mat& frame, cv::Mat& display,
 		Mat &lplane = labPlanes[lPlaneId];
 		split(signImage, labPlanes);
 
-		imshow("Sign: signImage", lplane);
+		//imshow("Sign: signImage", lplane);
 
 		t1 = getTickCount();
 		std::string matchStr = _features->FindMatch(type, lplane);
@@ -700,7 +700,8 @@ void ImgProcessor::UpdateSignCounter()
 		float val = detected.area/100.0f;
 		float dist = (_resolution.width/2)-(detected.roi.x + detected.roi.width / 2);
 		val = val*(_resolution.width / 2 - abs(dist)) / (_resolution.width / 2);
-		_signsDetectedCounter[detected.sign] += val;
+
+		_signsDetectedCounter[detected.sign] = (_signsDetectedCounter[detected.sign]  * 7 + val)/8;
 		_totalDetectedCounter += val;
 	}
 }
@@ -774,14 +775,15 @@ void ImgProcessor::CreateMapMask()
 
 void ImgProcessor::ResetSignCounter()
 {
-	_signsDetectedCounter.clear();
+	//_signsDetectedCounter.clear();
 	_totalDetectedCounter = 0;
 }
 
 void ImgProcessor::GetSignProbabilities(std::map<std::string, float>& out)
 {
 	for (auto signs : _signsDetectedCounter) {
-		out[signs.first] = signs.second / _totalDetectedCounter;
+		//out[signs.first] = signs.second / _totalDetectedCounter;
+		out[signs.first] = signs.second;
 	}
 }
 
