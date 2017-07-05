@@ -2,6 +2,7 @@
 #include <opencv2/imgcodecs.hpp>
 #include <exception>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
 
 FeatureLibrary::FeatureLibrary(DetectorType type, int colorSpace, int minHessian /* = 400 */) :
 	_type(type), _colorSpace(colorSpace)
@@ -236,6 +237,7 @@ bool FeatureLibrary::FindMatchSURFIllumCanny(FeatureType type, const std::string
 	cv::Mat img_matches;
 	cv::drawMatches(objectInfo.image, objectInfo.keypoints, image, sceneInfo.keypoints, goodMatches, img_matches,
 		cv::Scalar::all(-1), cv::Scalar::all(-1), std::vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+	imshow("features", img_matches);
 	if (minDist) *minDist = min_dist;
 	if (maxDist) *maxDist = max_dist;
 	if (avgDist) *avgDist = avg_dist;

@@ -486,14 +486,6 @@ void ImgProcessor::ProcessSigns(cv::Mat& frame, int frameGLTex, cv::Mat& display
 	imshow("YellowThresholds", yellowMask);
 	imshow("RedThresholds", redMask);
 
-	// Erosion
-	t1 = t2;
-	erode(blueMask, blueMask, Mat(), Point(-1, -1), 2);
-	erode(redMask, redMask, Mat(), Point(-1, -1), 1);
-	erode(yellowMask, yellowMask, Mat(), Point(-1, -1), 1);
-	t2 = getTickCount();
-	_perf.sign.erosion = t2 - t1;
-
 	// Dilation
 	t1 = t2;
 	dilate(blueMask, blueMask, Mat(), Point(-1, -1), 3);
@@ -501,6 +493,14 @@ void ImgProcessor::ProcessSigns(cv::Mat& frame, int frameGLTex, cv::Mat& display
 	dilate(yellowMask, yellowMask, Mat(), Point(-1, -1), 3);
 	t2 = getTickCount();
 	_perf.sign.dilation = t2 - t1;
+
+	// Erosion
+	t1 = t2;
+	erode(blueMask, blueMask, Mat(), Point(-1, -1), 2);
+	erode(redMask, redMask, Mat(), Point(-1, -1), 1);
+	erode(yellowMask, yellowMask, Mat(), Point(-1, -1), 1);
+	t2 = getTickCount();
+	_perf.sign.erosion = t2 - t1;
 
 	// Contours
 	t1 = t2;
