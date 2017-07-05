@@ -8,7 +8,7 @@ using namespace cv;
 
 Control::Control(ImgProcessor * imgProcessor, Communication * comm, bool debug) :
 	_state(State::Init), _img(imgProcessor), _comm(comm), _old("none"), _filter(0),
-	_debug(debug), _forwardDistance(20), _driveSpeed(40), _turnSpeed(40)
+	_debug(debug), _forwardDistance(20), _driveSpeed(40), _turnSpeed(40), _infSeen(0)
 {
 	assert(imgProcessor != nullptr);
 	assert(comm != nullptr);
@@ -24,9 +24,9 @@ void Control::Update(float deltaTime)
 	float lineL, lineM, lineR;
 	GetMapDistances(lineL, lineM, lineR);
 	int detectedLines = 0;
-	detectedLines |= lineR < 8 ? 1 : 0;
-	detectedLines |= lineM < 10 ? 2 : 0;
-	detectedLines |= lineL < 8 ? 4 : 0;
+	detectedLines |= lineR < 12 ? 1 : 0;
+	detectedLines |= lineM < 15 ? 2 : 0;
+	detectedLines |= lineL < 12 ? 4 : 0;
 	std::string sign;
 	float signProb;
 	_img->GetMostProbableSign(sign, signProb);
@@ -67,12 +67,12 @@ void Control::Update(float deltaTime)
 			case 6: // Turn right
 				_state = State::DriveForwardTurnRight;
 				_checkReadyReceived = _comm->GetReadyReceived();
-				_comm->Forward(forwardDist, _driveSpeed);
+				_comm->Forward(10, _driveSpeed);
 				break;
 			case 3: // Turn left
 				_state = State::DriveForwardTurnLeft;
 				_checkReadyReceived = _comm->GetReadyReceived();
-				_comm->Forward(forwardDist, _driveSpeed);
+				_comm->Forward(10, _driveSpeed);
 				break;
 			case 0:
 			case 2: // Crossing
@@ -118,19 +118,53 @@ void Control::Update(float deltaTime)
 	}
 	case State::DriveForwardTurnLeft: {
 		if (_checkReadyReceived != _comm->GetReadyReceived()) {
-			_checkReadyReceived = _comm->GetReadyReceived();
-			_img->ResetSignCounter();
-			_comm->Turn(-90, _turnSpeed);
-			_state = State::FinishCommand;
+			if (!isinf(lineM) && lineM <= 5) {
+				_img->ResetSignCounter();
+				_checkReadyReceived = _comm->GetReadyReceived();
+				_comm->Turn(-90, _turnSpeed);
+				_state = State::SignFinishedCommand;
+				_infSeen = 0;
+			}
+			else if(!isinf(lineM) && lineM > 5) {
+				_checkReadyReceived = _comm->GetReadyReceived();
+				_comm->Forward(10, _driveSpeed);
+				_infSeen = 0;
+			}
+			else {
+				if (_infSeen > 0) {
+					_state = State::Drive;
+					_infSeen = 0;
+				}
+				else {
+					_infSeen++;
+				}
+			}
 		}
 		break;
 	}
 	case State::DriveForwardTurnRight: {
 		if (_checkReadyReceived != _comm->GetReadyReceived()) {
-			_checkReadyReceived = _comm->GetReadyReceived();
-			_img->ResetSignCounter();
-			_comm->Turn(90, _turnSpeed);
-			_state = State::FinishCommand;
+			if (!isinf(lineM) && lineM <= 5) {
+				_img->ResetSignCounter();
+				_checkReadyReceived = _comm->GetReadyReceived();
+				_comm->Turn(90, _turnSpeed);
+				_state = State::SignFinishedCommand;
+				_infSeen = 0;
+			}
+			else if (!isinf(lineM) && lineM > 5) {
+				_checkReadyReceived = _comm->GetReadyReceived();
+				_comm->Forward(10, _driveSpeed);
+				_infSeen = 0;
+			}
+			else {
+				if (_infSeen > 0) {
+					_state = State::Drive;
+					_infSeen = 0;
+				}
+				else {
+					_infSeen++;
+				}
+			}
 		}
 		break;
 	}
@@ -155,7 +189,7 @@ void Control::Update(float deltaTime)
 			_checkReadyReceived = _comm->GetReadyReceived();
 			_img->ResetSignCounter();
 			_comm->Turn(180, _turnSpeed);
-			_state = State::FinishCommand;
+			_state = State::SignFinishedCommand;
 		}
 		break;
 	}
@@ -195,7 +229,7 @@ void Control::GetMapDistances(float & l, float & m, float & r)
 	//HoughLinesP(map, lines, 2, 30 * CV_PI / 180, 5, 4, 2);
 
 	Point2f origin(map.cols / 2, 0);
-	const float lAngle = -30 * CV_PI / 180;
+	const float lAngle = -50 * CV_PI / 180;
 	const float rAngle = -lAngle;
 	const float dAngle = 5 * CV_PI / 180;
 	float m1, m2, m3;

@@ -44,6 +44,7 @@ private:
 	int _turnSpeed;
 	int _forwardDistance;
 	int _checkReadyReceived;
+	int _infSeen;
 };
 
 #endif
